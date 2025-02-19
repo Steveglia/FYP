@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { generateClient } from 'aws-amplify/data';
+import { getUrl, uploadData } from 'aws-amplify/storage';
 import type { Schema } from '../amplify/data/resource';
 import Navigation from './components/Navigation';
 import Home from './pages/Home';
@@ -35,6 +36,38 @@ async function initializeStudyPreference(userId: string) {
   }
 }
 
+async function checkAndCreateUserFile(userId: string) {
+  const fileName = `${userId}.json`;
+
+  try {
+    // Try to get the file URL - this will throw if file doesn't exist
+    await getUrl({
+      key: fileName
+    });
+    console.log('File exists');
+  } catch (error: any) {
+    if (error.name === 'StorageError') {
+      // File doesn't exist, create it
+      try {
+        await uploadData({
+          key: fileName,
+          data: JSON.stringify({ events: [] }),
+          options: {
+            contentType: 'application/json'
+          }
+        });
+        console.log('File created');
+      } catch (uploadError) {
+        console.error('Error creating file:', uploadError);
+        throw uploadError;
+      }
+    } else {
+      console.error('Error checking file:', error);
+      throw error;
+    }
+  }
+}
+
 function App() {
   const { user } = useAuthenticator();
   const [preferencesInitialized, setPreferencesInitialized] = useState(false);
@@ -42,8 +75,11 @@ function App() {
   useEffect(() => {
     if (user && !preferencesInitialized) {
       initializeStudyPreference(user.username)
-        .then(() => setPreferencesInitialized(true))
-        .catch((error) => console.error("Failed to initialize preferences:", error));
+        .then(() => {
+          setPreferencesInitialized(true);
+          return checkAndCreateUserFile(user.username);
+        })
+        .catch((error) => console.error("Failed to initialize preferences or check file:", error));
     }
   }, [user, preferencesInitialized]);
 
