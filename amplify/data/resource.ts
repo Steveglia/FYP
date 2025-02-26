@@ -1,51 +1,54 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
+import { store_events } from "../functions/storeEvents/resource";
 
 /*== STEP 1 ===============================================================
 The section below creates a Todo database table with a "content" field. Try
 adding a new "isDone" field as a boolean. The authorization rule below
 specifies that any user authenticated via an API key can "create", "read",
-"update", and "delete" any "Todo" records.
+"update", and "delete" any "Todo" records. 32232
 =========================================================================*/
-const schema = a.schema({
-  Todo: a
-    .model({
-      content: a.string(),
-    }).authorization(allow => [allow.owner()]),
-  
-  Event: a
-    .model({
-      title: a.string(),
-      description: a.string(),
-      startDate: a.string(),
-      endDate: a.string(),
-      location: a.string(),
-    }).authorization(allow => [allow.owner()]),
-
-  StudyPreference: a
-    .model({
-      studyTime: a.string(),
-      maxHoursPerDay: a.integer(),
-      lunchBreakStart: a.string(),
-      lunchBreakDuration: a.integer(),
-      studyDuringWork: a.boolean(),
-      preferredStartTime: a.string(),
-      preferredEndTime: a.string(),
-      owner: a.string(),  // To ensure one record per user
-    })
-    .authorization(allow => [allow.owner()])
-});
+const schema = a
+  .schema({
+    
+    Event: a
+      .model({
+        title: a.string(),
+        description: a.string(),
+        startDate: a.string(),
+        endDate: a.string(),
+        location: a.string(),
+      })
+      .authorization(allow => [allow.publicApiKey()])
+      ,
+    StudyPreference: a
+      .model({
+        studyTime: a.string(),
+        maxHoursPerDay: a.integer(),
+        lunchBreakStart: a.string(),
+        lunchBreakDuration: a.integer(),
+        studyDuringWork: a.boolean(),
+        preferredStartTime: a.string(),
+        preferredEndTime: a.string(),
+        owner: a.string(),
+      })
+      .authorization(allow => [allow.publicApiKey()]),
+  })
+  .authorization(allow => [
+    allow.resource(store_events)])
+  ;
 
 export type Schema = ClientSchema<typeof schema>;
 
 export const data = defineData({
   schema,
   authorizationModes: {
-    // This tells the data client in your app (generateClient())
-    // to sign API requests with the user authentication token.
-    defaultAuthorizationMode: 'userPool',
+   
+    defaultAuthorizationMode: 'apiKey',
   },
 
 });
+
+
 
 /*== STEP 2 ===============================================================
 Go to your frontend source code. From your client-side code, generate a
