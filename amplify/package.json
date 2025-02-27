@@ -1,9 +1,0 @@
-{
-  "type": "module",
-  "scripts": {
-    "backend": "amplify backend",
-    "backend-build": "amplify backend build",
-    "backend-clean": "amplify backend clean",
-    "backend-push": "amplify backend push"
-  }
-}
