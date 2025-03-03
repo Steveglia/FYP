@@ -24,8 +24,9 @@ const schema = a
         preferredStartTime: a.string(),
         preferredEndTime: a.string(),
         owner: a.string(),
+        courses: a.string().array()
       })
-      .authorization(allow => [allow.owner()]),
+      .authorization(allow => [allow.publicApiKey()]),
   })
   .authorization(allow => [
     allow.resource(store_events)])

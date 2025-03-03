@@ -28,12 +28,16 @@ const Preferences = () => {
       }
 
       try {
-        const response = await client.models.StudyPreference.list({
+        const { data: preferences, errors } = await client.models.StudyPreference.list({
           filter: { owner: { eq: user.username } }
         });
-        
-        if (response.data.length > 0) {
-          const userPrefs = response.data[0];
+
+        if (errors) {
+          throw new Error('Failed to load preferences');
+        }
+
+        if (preferences.length > 0) {
+          const userPrefs = preferences[0];
           setPreferences({
             studyTime: userPrefs.studyTime ?? "4",
             maxHoursPerDay: userPrefs.maxHoursPerDay ?? 8,
@@ -43,10 +47,29 @@ const Preferences = () => {
             preferredStartTime: userPrefs.preferredStartTime ?? "09:00",
             preferredEndTime: userPrefs.preferredEndTime ?? "17:00"
           });
+        } else {
+          const defaultPrefs = {
+            studyTime: "4",
+            maxHoursPerDay: 8,
+            lunchBreakStart: "12:00",
+            lunchBreakDuration: 60,
+            studyDuringWork: false,
+            preferredStartTime: "09:00",
+            preferredEndTime: "17:00",
+            owner: user.username
+          };
+
+          const { errors: createErrors } = await client.models.StudyPreference.create(defaultPrefs);
+          
+          if (createErrors) {
+            throw new Error('Failed to create preferences');
+          }
+
+          setPreferences(defaultPrefs);
         }
       } catch (error) {
         console.error("Error loading preferences:", error);
-        setMessage({ type: 'error', text: 'Failed to load preferences. Please try again.' });
+        setMessage({ type: 'error', text: 'Failed to load preferences' });
       } finally {
         setLoading(false);
       }
@@ -73,27 +96,24 @@ const Preferences = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) {
-      setMessage({ type: 'error', text: 'Please log in to save preferences' });
-      return;
-    }
-
-    if (!validatePreferences()) {
-      return;
-    }
+    if (!user || !validatePreferences()) return;
 
     setSaving(true);
     setMessage(null);
 
     try {
-      const response = await client.models.StudyPreference.list({
+      const { data: existingPrefs, errors: listErrors } = await client.models.StudyPreference.list({
         filter: { owner: { eq: user.username } }
       });
 
-      if (response.data.length > 0) {
-        const existingPref = response.data[0];
-        await client.models.StudyPreference.update({
-          id: existingPref.id,
+      if (listErrors) {
+        throw new Error('Failed to check existing preferences');
+      }
+
+      let result;
+      if (existingPrefs.length > 0) {
+        const { data: updatedPrefs, errors: updateErrors } = await client.models.StudyPreference.update({
+          id: existingPrefs[0].id,
           studyTime: preferences.studyTime,
           maxHoursPerDay: preferences.maxHoursPerDay,
           lunchBreakStart: preferences.lunchBreakStart,
@@ -103,11 +123,28 @@ const Preferences = () => {
           preferredEndTime: preferences.preferredEndTime,
           owner: user.username
         });
-        setMessage({ type: 'success', text: 'Preferences saved successfully!' });
+
+        if (updateErrors) {
+          throw new Error('Failed to update preferences');
+        }
+        result = updatedPrefs;
+      } else {
+        const { data: newPrefs, errors: createErrors } = await client.models.StudyPreference.create({
+          ...preferences,
+          owner: user.username
+        });
+
+        if (createErrors) {
+          throw new Error('Failed to create preferences');
+        }
+        result = newPrefs;
       }
+
+      setMessage({ type: 'success', text: 'Preferences saved successfully!' });
+      console.log('Saved preferences:', result);
     } catch (error) {
       console.error("Error saving preferences:", error);
-      setMessage({ type: 'error', text: 'Failed to save preferences. Please try again.' });
+      setMessage({ type: 'error', text: 'Failed to save preferences' });
     } finally {
       setSaving(false);
     }

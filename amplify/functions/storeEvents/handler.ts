@@ -1,11 +1,16 @@
 import type { S3Handler } from 'aws-lambda';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { generateClient } from 'aws-amplify/data';
+import { type Schema } from '../../data/resource';
+import { Amplify } from 'aws-amplify';
+import outputs from "../../../amplify_outputs.json";
+
+
+
+Amplify.configure(outputs);
 
 const s3Client = new S3Client();
-const ddbClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
-const EVENTS_TABLE_NAME = process.env.EVENTS_TABLE_NAME;
+const client = generateClient<Schema>();
 
 interface EventData {
   events: Array<{
@@ -36,22 +41,22 @@ export const handler: S3Handler = async (event) => {
             const bodyContents = await streamToString(response.Body);
             const { events } = JSON.parse(bodyContents) as EventData;
 
-            // Process each event in the array
+            // Process each event using Amplify Data client
             for (const eventItem of events) {
-                const putCommand = new PutCommand({
-                    TableName: EVENTS_TABLE_NAME,
-                    Item: {
-                        id: eventItem.id,
-                        title: eventItem.title,
-                        description: eventItem.description,
-                        startDate: eventItem.start_date,
-                        endDate: eventItem.end_date,
-                        location: eventItem.location,
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString()
-                    }
+                const { errors, data: newEvent } = await client.models.Event.create({
+                    title: eventItem.title,
+                    description: eventItem.description,
+                    startDate: eventItem.start_date,
+                    endDate: eventItem.end_date,
+                    location: eventItem.location
                 });
-                await ddbClient.send(putCommand);
+
+                if (errors) {
+                    console.error('Error creating event:', errors);
+                    continue;
+                }
+
+                console.log('Successfully created event:', newEvent);
             }
 
             console.log(`Successfully processed ${events.length} events from ${key}`);

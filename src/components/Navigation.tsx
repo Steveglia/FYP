@@ -1,5 +1,5 @@
 import { useAuthenticator } from '@aws-amplify/ui-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, NavLink } from 'react-router-dom';
 
 const Navigation = () => {
   const { user, signOut } = useAuthenticator();
@@ -20,6 +20,14 @@ const Navigation = () => {
         <Link to="/preferences" className={location.pathname === '/preferences' ? 'active' : ''}>
           Preferences
         </Link>
+        <li>
+          <NavLink 
+            to="/courses" 
+            className={({ isActive }) => isActive ? 'active' : ''}
+          >
+            Courses
+          </NavLink>
+        </li>
       </div>
       <button onClick={signOut} className="sign-out-btn">Sign out</button>
     </nav>
