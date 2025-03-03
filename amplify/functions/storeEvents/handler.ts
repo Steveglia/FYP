@@ -3,11 +3,12 @@ import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { generateClient } from 'aws-amplify/data';
 import { type Schema } from '../../data/resource';
 import { Amplify } from 'aws-amplify';
-import outputs from "../../../amplify_outputs.json";
+// @ts-ignore
+const amplifyOutputs = process.env.NODE_ENV === 'test' 
+  ? {} 
+  : require('../../../amplify_outputs.json');
 
-
-
-Amplify.configure(outputs);
+Amplify.configure(amplifyOutputs);
 
 const s3Client = new S3Client();
 const client = generateClient<Schema>();
