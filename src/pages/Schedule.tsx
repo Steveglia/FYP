@@ -6,16 +6,16 @@ import WeeklySchedule from '../components/WeeklySchedule';
 const client = generateClient<Schema>();
 
 const Schedule = () => {
-  const [events, setEvents] = useState<Array<Schema["Event"]["type"]>>([]);
+  const [events, setEvents] = useState<Array<Schema["CalendarEvent"]["type"]>>([]);
 
   useEffect(() => {
-    client.models.Event.observeQuery().subscribe({
+    client.models.CalendarEvent.observeQuery().subscribe({
       next: (data) => setEvents([...data.items]),
     });
   }, []);
 
   function createEvent() {
-    client.models.Event.create({
+    client.models.CalendarEvent.create({
       title: window.prompt("Event title") || "",
       description: window.prompt("Event description") || "",
       startDate: window.prompt("Start date") || "",

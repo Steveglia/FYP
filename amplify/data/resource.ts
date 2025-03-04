@@ -1,10 +1,9 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 import { store_events } from "../functions/storeEvents/resource";
 
-
 const schema = a
   .schema({
-    Event: a
+    CalendarEvent: a
       .model({
         title: a.string(),
         description: a.string(),
@@ -12,8 +11,7 @@ const schema = a
         endDate: a.string(),
         location: a.string(),
       })
-      .authorization(allow => [allow.publicApiKey()])
-      ,
+      .authorization(allow => [allow.publicApiKey()]),
     StudyPreference: a
       .model({
         studyTime: a.string(),
@@ -37,8 +35,6 @@ export type Schema = ClientSchema<typeof schema>;
 export const data = defineData({
   schema,
   authorizationModes: {
-   
     defaultAuthorizationMode: 'apiKey',
   },
-
 });

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Schema } from "../../amplify/data/resource";
 import { generateWeekVector } from '../utils/scheduleUtils';
 
-type Event = Schema["Event"]["type"];
+type Event = Schema["CalendarEvent"]["type"];
 
 interface WeeklyScheduleProps {
   events: Event[];

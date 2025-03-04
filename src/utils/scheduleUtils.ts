@@ -1,6 +1,6 @@
 import type { Schema } from "../../amplify/data/resource";
 
-type Event = Schema["Event"]["type"];
+type Event = Schema["CalendarEvent"]["type"];
 
 export const generateWeekVector = (
   events: Event[],

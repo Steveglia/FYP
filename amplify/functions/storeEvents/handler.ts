@@ -3,20 +3,10 @@ import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { generateClient } from 'aws-amplify/data';
 import { type Schema } from '../../data/resource';
 import { Amplify } from 'aws-amplify';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import outputs from '../../../amplify_outputs.json';
 
-// Load amplify outputs dynamically
-let amplifyOutputs = {};
-try {
-  const outputPath = join(__dirname, '../../../amplify_outputs.json');
-  const outputContent = readFileSync(outputPath, 'utf-8');
-  amplifyOutputs = JSON.parse(outputContent);
-} catch (error) {
-  console.warn('Could not load amplify outputs, using empty config:', error);
-}
 
-Amplify.configure(amplifyOutputs);
+Amplify.configure(outputs);
 
 const s3Client = new S3Client();
 const client = generateClient<Schema>();
@@ -52,7 +42,7 @@ export const handler: S3Handler = async (event) => {
 
             // Process each event using Amplify Data client
             for (const eventItem of events) {
-                const { errors, data: newEvent } = await client.models.Event.create({
+                const { errors, data: newEvent } = await client.models.CalendarEvent.create({
                     title: eventItem.title,
                     description: eventItem.description,
                     startDate: eventItem.start_date,
