@@ -10,17 +10,17 @@ const schema = a
         startDate: a.string(),
         endDate: a.string(),
         location: a.string(),
+        type: a.enum(['WORK', 'STUDY', 'MEETING', 'OTHER']),
       })
       .authorization(allow => [allow.publicApiKey()]),
-    StudyPreference: a
+      StudyPreference: a
       .model({
         studyTime: a.string(),
         maxHoursPerDay: a.integer(),
         lunchBreakStart: a.string(),
         lunchBreakDuration: a.integer(),
         studyDuringWork: a.boolean(),
-        preferredStartTime: a.string(),
-        preferredEndTime: a.string(),
+        preferredTimeOfDay: a.enum(['MORNING', 'EVENING']),
         owner: a.string(),
         courses: a.string().array()
       })

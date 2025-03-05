@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import type { Schema } from "../../amplify/data/resource";
 import { generateWeekVector } from '../utils/scheduleUtils';
+import { useAuthenticator } from '@aws-amplify/ui-react';
 
 type Event = Schema["CalendarEvent"]["type"];
 
 interface WeeklyScheduleProps {
   events: Event[];
+  userId: string;
 }
 
 interface ScheduleEvent extends Event {
@@ -13,7 +15,17 @@ interface ScheduleEvent extends Event {
   duration?: number;
 }
 
+// Update event type color mapping
+const eventTypeColors = {
+  WORK: '#e74c3c',    // red for work
+  STUDY: '#3498db',   // blue for study
+  MEETING: '#2ecc71', // green for meetings
+  OTHER: '#f39c12',   // orange for other events
+  default: '#95a5a6'  // grey for unknown types
+};
+
 const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events }) => {
+  const { user } = useAuthenticator();
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const hours = Array.from({ length: 15 }, (_, i) => i + 8); // 8 AM to 10 PM
   
@@ -83,7 +95,8 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events }) => {
   };
 
   const handleGenerateStudySessions = () => {
-    return generateWeekVector(events, currentWeekStart, weekDays);
+    if (!user) return;
+    return generateWeekVector(events, currentWeekStart, weekDays, user.username);
   };
 
   return (
@@ -123,9 +136,15 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events }) => {
                       className="event-item"
                       style={{ 
                         height: `${(event.duration || 1) * 46}px`,
-                        marginTop: '2px'
+                        marginTop: '2px',
+                        backgroundColor: eventTypeColors[event.type as keyof typeof eventTypeColors] || eventTypeColors.default,
+                        color: '#ffffff',
+                        padding: '4px',
+                        borderRadius: '4px',
+                        overflow: 'hidden',
+                        cursor: 'pointer'
                       }}
-                      title={`${event.title}\n${event.description}\n${event.location}`}
+                      title={`${event.title}\n${event.description || ''}\n${event.location || ''}\nType: ${event.type}`}
                     >
                       {event.title}
                     </div>

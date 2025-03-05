@@ -13,8 +13,7 @@ const Preferences = () => {
     lunchBreakStart: "12:00",
     lunchBreakDuration: 60,
     studyDuringWork: false,
-    preferredStartTime: "09:00",
-    preferredEndTime: "17:00"
+    preferredTimeOfDay: "MORNING" as "MORNING" | "EVENING"
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -44,8 +43,7 @@ const Preferences = () => {
             lunchBreakStart: userPrefs.lunchBreakStart ?? "12:00",
             lunchBreakDuration: userPrefs.lunchBreakDuration ?? 60,
             studyDuringWork: userPrefs.studyDuringWork ?? false,
-            preferredStartTime: userPrefs.preferredStartTime ?? "09:00",
-            preferredEndTime: userPrefs.preferredEndTime ?? "17:00"
+            preferredTimeOfDay: userPrefs.preferredTimeOfDay ?? "MORNING"
           });
         } else {
           const defaultPrefs = {
@@ -54,8 +52,7 @@ const Preferences = () => {
             lunchBreakStart: "12:00",
             lunchBreakDuration: 60,
             studyDuringWork: false,
-            preferredStartTime: "09:00",
-            preferredEndTime: "17:00",
+            preferredTimeOfDay: "MORNING" as "MORNING" | "EVENING",
             owner: user.username
           };
 
@@ -119,8 +116,7 @@ const Preferences = () => {
           lunchBreakStart: preferences.lunchBreakStart,
           lunchBreakDuration: preferences.lunchBreakDuration,
           studyDuringWork: preferences.studyDuringWork,
-          preferredStartTime: preferences.preferredStartTime,
-          preferredEndTime: preferences.preferredEndTime,
+          preferredTimeOfDay: preferences.preferredTimeOfDay,
           owner: user.username
         });
 
@@ -212,20 +208,14 @@ const Preferences = () => {
           </label>
         </div>
         <div className="form-group">
-          <label>Preferred Start Time</label>
-          <input
-            type="time"
-            value={preferences.preferredStartTime}
-            onChange={(e) => setPreferences({ ...preferences, preferredStartTime: e.target.value })}
-          />
-        </div>
-        <div className="form-group">
-          <label>Preferred End Time</label>
-          <input
-            type="time"
-            value={preferences.preferredEndTime}
-            onChange={(e) => setPreferences({ ...preferences, preferredEndTime: e.target.value })}
-          />
+          <label>Preferred Time of Day</label>
+          <select
+            value={preferences.preferredTimeOfDay}
+            onChange={(e) => setPreferences({ ...preferences, preferredTimeOfDay: e.target.value as "MORNING" | "EVENING" })}
+          >
+            <option value="MORNING">Morning</option>
+            <option value="EVENING">Evening</option>
+          </select>
         </div>
         <button type="submit" disabled={saving}>
           {saving ? 'Saving...' : 'Save Preferences'}

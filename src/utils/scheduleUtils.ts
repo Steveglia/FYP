@@ -1,38 +1,83 @@
 import type { Schema } from "../../amplify/data/resource";
+import { generateClient } from 'aws-amplify/api';
 
 type Event = Schema["CalendarEvent"]["type"];
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type StudyPreference = Schema["StudyPreference"]["type"];
 
-export const generateWeekVector = (
+const client = generateClient<Schema>();
+
+export const generateWeekVector = async (
   events: Event[],
   currentWeekStart: Date,
-  weekDays: string[]
+  weekDays: string[],
+  userId: string
 ) => {
-  // Create a vector for the entire week (15 hours * 7 days = 105 slots)
-  const weekVector: number[] = new Array(105).fill(0);
+  const studyPreferences = await client.models.StudyPreference.list({
+    filter: { owner: { eq: userId } }
+  });
   
-  // Calculate week end date
+  const studyPreference = studyPreferences.data[0];
+  const weekVector: number[] = new Array(105).fill(1);
+  
+  // First, set base preferences
+  if (studyPreference) {
+    for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+      for (let hour = 8; hour <= 22; hour++) {
+        const vectorIndex = (dayIndex * 15) + (hour - 8);
+        
+        if (studyPreference.preferredTimeOfDay === 'MORNING') {
+          if (hour >= 8 && hour <= 12) {
+            weekVector[vectorIndex] = 9;
+          } else if (hour > 12 && hour <= 15) {
+            weekVector[vectorIndex] = 6;
+          } else if (hour > 15 && hour <= 18) {
+            weekVector[vectorIndex] = 4;
+          } else {
+            weekVector[vectorIndex] = 2;
+          }
+        } else if (studyPreference.preferredTimeOfDay === 'EVENING') {
+          if (hour >= 18 && hour <= 22) {
+            weekVector[vectorIndex] = 9;
+          } else if (hour >= 15 && hour < 18) {
+            weekVector[vectorIndex] = 6;
+          } else if (hour >= 12 && hour < 15) {
+            weekVector[vectorIndex] = 4;
+          } else {
+            weekVector[vectorIndex] = 2;
+          }
+        }
+      }
+    }
+  }
+
   const weekEndDate = new Date(currentWeekStart);
   weekEndDate.setDate(currentWeekStart.getDate() + 7);
 
-  // Process each event
+  // Helper function to get correct day index
+  const getDayIndex = (date: Date): number => {
+    const day = date.getDay(); // 0 (Sunday) to 6 (Saturday)
+    // If weekDays starts with Monday, transform Sunday(0) -> 6, Monday(1) -> 0, etc.
+    return day === 0 ? 6 : day - 1;
+  };
+
+  // Then, process events to mark unavailable times
   events.forEach(event => {
     if (event.startDate && event.endDate) {
       const startDate = new Date(event.startDate);
       const endDate = new Date(event.endDate);
 
-      // Only process events within the current week
       if (startDate >= currentWeekStart && startDate < weekEndDate) {
-        const dayIndex = startDate.getDay() === 0 ? 6 : startDate.getDay() - 1;
+        const dayIndex = getDayIndex(startDate);  // Use helper function
         const startHour = startDate.getHours();
         const endHour = endDate.getHours();
 
-        // Only consider hours between 8 AM and 10 PM
+        // Only mark the exact event duration as unavailable
         if (startHour >= 8 && startHour <= 22) {
-          // Mark occupied time slots with 1
           for (let hour = startHour; hour <= Math.min(endHour, 22); hour++) {
             if (hour >= 8 && hour <= 22) {
               const vectorIndex = (dayIndex * 15) + (hour - 8);
-              weekVector[vectorIndex] = 1;
+              weekVector[vectorIndex] = 0;
             }
           }
         }
@@ -40,15 +85,34 @@ export const generateWeekVector = (
     }
   });
 
-  // Log the vector in a more readable format
-  console.log('Week Schedule Vector:');
+  // Finally, adjust work day preferences if needed
+  if (studyPreference?.studyDuringWork === false) {
+    events.forEach(event => {
+      if (event.type === 'WORK' && event.startDate) {
+        const eventDate = new Date(event.startDate);
+        
+        // Only process work events in the current week
+        if (eventDate >= currentWeekStart && eventDate < weekEndDate) {
+          const dayIndex = getDayIndex(eventDate);
+          
+          // Reduce preference on work days (but don't set to 0)
+          for (let hour = 8; hour <= 22; hour++) {
+            const vectorIndex = (dayIndex * 15) + (hour - 8);
+            if (weekVector[vectorIndex] !== 0) { // Don't override already blocked times
+              weekVector[vectorIndex] = Math.min(weekVector[vectorIndex], 3);
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Log the vector
+  console.log('Week Schedule Vector with Preferences:');
   weekDays.forEach((day, dayIndex) => {
     const dayVector = weekVector.slice(dayIndex * 15, (dayIndex + 1) * 15);
     console.log(`${day}:`, dayVector.join(' '));
   });
-
-  // Log the raw vector as well
-  console.log('Raw vector:', weekVector);
 
   return weekVector;
 }; 
