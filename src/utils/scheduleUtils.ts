@@ -2,8 +2,6 @@ import type { Schema } from "../../amplify/data/resource";
 import { generateClient } from 'aws-amplify/api';
 
 type Event = Schema["CalendarEvent"]["type"];
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type StudyPreference = Schema["StudyPreference"]["type"];
 
 const client = generateClient<Schema>();
 
