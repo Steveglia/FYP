@@ -96,7 +96,44 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events }) => {
 
   const handleGenerateStudySessions = () => {
     if (!user) return;
-    return generateWeekVector(events, currentWeekStart, weekDays, user.username);
+    
+    // Filter events for current week only
+    const weekEndDate = new Date(currentWeekStart);
+    weekEndDate.setDate(currentWeekStart.getDate() + 7);
+    
+    // Create initial availability vector (all available)
+    const availabilityVector = new Array(105).fill(1);
+    
+    // Mark unavailable times based on events
+    events.forEach(event => {
+      if (event.startDate && event.endDate) {
+        const startDate = new Date(event.startDate);
+        const endDate = new Date(event.endDate);
+        
+        // Only process events within the current week
+        if (startDate >= currentWeekStart && startDate < weekEndDate) {
+          // Get day index (0 = Monday, 6 = Sunday)
+          const day = startDate.getDay();
+          const dayIndex = day === 0 ? 6 : day - 1;
+          
+          const startHour = startDate.getHours();
+          const endHour = endDate.getHours();
+          
+          // Mark time slots as unavailable
+          if (startHour >= 8 && startHour <= 22) {
+            for (let hour = startHour; hour <= Math.min(endHour, 22); hour++) {
+              if (hour >= 8 && hour <= 22) {
+                const vectorIndex = (dayIndex * 15) + (hour - 8);
+                availabilityVector[vectorIndex] = 0; // Mark as unavailable
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    // Pass only the availability vector and userId
+    return generateWeekVector(availabilityVector, user.username);
   };
 
   return (
