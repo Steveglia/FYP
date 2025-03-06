@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import type { Schema } from "../../amplify/data/resource";
 import { generateClient } from "aws-amplify/data";
 import WeeklySchedule from '../components/WeeklySchedule';
+import { useAuthenticator } from '@aws-amplify/ui-react';
 
 const client = generateClient<Schema>();
 
 const Schedule = () => {
+  const { user } = useAuthenticator();
   const [events, setEvents] = useState<Array<Schema["CalendarEvent"]["type"]>>([]);
 
   useEffect(() => {
@@ -28,7 +30,7 @@ const Schedule = () => {
     <div className="schedule-page">
       <h1>Weekly Schedule</h1>
       <button onClick={createEvent}>+ New Event</button>
-      <WeeklySchedule events={events} />
+      <WeeklySchedule events={events} userId={user?.username || ''} />
     </div>
   );
 };

@@ -27,8 +27,7 @@ async function initializeStudyPreference(userId: string) {
         lunchBreakStart: "12:00",
         lunchBreakDuration: 60,
         studyDuringWork: false,
-        preferredStartTime: "09:00",
-        preferredEndTime: "17:00",
+        preferredTimeOfDay: "MORNING",
         owner: userId
       });
     }
