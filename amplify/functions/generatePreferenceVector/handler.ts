@@ -1,8 +1,17 @@
 import type { Schema } from "../../data/resource";
 import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/api';
-import outputs from "../../../amplify_outputs.json";
-// Configure Amplify before using the client
+
+let outputs: any;
+try {
+  // Dynamically require the outputs; this will run at runtime
+  outputs = require("../../../amplify_outputs.json");
+} catch (err) {
+  // Handle the case where the file is not yet available
+  console.log('Amplify outputs not available:', err);
+  outputs = {};
+}
+
 Amplify.configure(outputs);
 
 const client = generateClient<Schema>();

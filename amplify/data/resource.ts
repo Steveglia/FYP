@@ -14,9 +14,7 @@ const schema = a
       .handler(a.handler.function(generatePreferenceVector))
       .authorization(
         allow => [
-          allow.publicApiKey(),
-          allow.authenticated()
-        ]
+          allow.publicApiKey()]
       ),
     CalendarEvent: a
       .model({
