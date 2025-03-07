@@ -94,7 +94,7 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events }) => {
     });
   };
 
-  const handleGenerateStudySessions = () => {
+  const handleGenerateStudySessions = async () => {
     if (!user) return;
     
     // Filter events for current week only
@@ -132,8 +132,18 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events }) => {
       }
     });
     
-    // Pass only the availability vector and userId
-    return generateWeekVector(availabilityVector, user.username);
+    try {
+      // Pass the availability vector and userId to generate the preference vector
+      const preferenceVector = await generateWeekVector(availabilityVector, user.username);
+      console.log('Generated preference vector:', preferenceVector);
+      
+      // Here you can add code to display the generated study sessions
+      // or navigate to a page that shows them
+      
+      return preferenceVector;
+    } catch (error) {
+      console.error('Error generating study sessions:', error);
+    }
   };
 
   return (

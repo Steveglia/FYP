@@ -1,8 +1,23 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 import { store_events } from "../functions/storeEvents/resource";
+import { generatePreferenceVector } from "../functions/generatePreferenceVector/resource";
 
 const schema = a
   .schema({
+    generatePreferenceVector: a
+      .query()
+      .arguments({
+        availabilityVector: a.string(),
+        userId: a.string(),
+      })
+      .returns(a.string())
+      .handler(a.handler.function(generatePreferenceVector))
+      .authorization(
+        allow => [
+          allow.publicApiKey(),
+          allow.authenticated()
+        ]
+      ),
     CalendarEvent: a
       .model({
         title: a.string(),
