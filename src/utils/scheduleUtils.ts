@@ -20,7 +20,7 @@ export const generateWeekVector = async (availabilityVector: number[], userId: s
       userId: userId
     });
     
-    return result.data || JSON.stringify(availabilityVector);
+    return result.data || 'Error generating preference vector:';
   } catch (error) {
     console.error('Error generating preference vector:', error);
     return JSON.stringify(availabilityVector);
