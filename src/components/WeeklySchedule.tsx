@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import type { Schema } from "../../amplify/data/resource";
-import { generateWeekVector } from '../utils/scheduleUtils';
 import { useAuthenticator } from '@aws-amplify/ui-react';
+import { generateClient } from 'aws-amplify/api';
 
 type Event = Schema["CalendarEvent"]["type"];
+const client = generateClient<Schema>();
 
 interface WeeklyScheduleProps {
   events: Event[];
@@ -39,6 +40,14 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events }) => {
     monday.setHours(0, 0, 0, 0);
     return monday;
   });
+  
+  // Add state for generated study sessions
+  const [generatedStudySessions, setGeneratedStudySessions] = useState<Event[]>([]);
+  
+  // Combine regular events with generated study sessions
+  const allEvents = useMemo(() => {
+    return [...events, ...generatedStudySessions];
+  }, [events, generatedStudySessions]);
 
   const eventsByDayAndTime = useMemo(() => {
     const schedule: { [key: string]: { [key: string]: ScheduleEvent[] } } = {};
@@ -55,7 +64,7 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events }) => {
     const weekEndDate = new Date(currentWeekStart);
     weekEndDate.setDate(currentWeekStart.getDate() + 7);
 
-    events.forEach(event => {
+    allEvents.forEach(event => {
       if (event.startDate && event.endDate) {
         const startDate = new Date(event.startDate);
         const endDate = new Date(event.endDate);
@@ -83,7 +92,7 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events }) => {
     });
 
     return schedule;
-  }, [events, currentWeekStart]);
+  }, [allEvents, currentWeekStart, weekDays, hours]);
 
   // Add navigation functions
   const navigateWeek = (direction: 'prev' | 'next') => {
@@ -133,18 +142,159 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events }) => {
     });
     
     try {
-      // Pass the availability vector and userId to generate the preference vector
-      const preferenceVector = await generateWeekVector(availabilityVector, user.username);
-      console.log('Study:', preferenceVector);
+      // Call generatePreferenceVector directly
+      const result = await client.queries.generatePreferenceVector({
+        availabilityVector: JSON.stringify(availabilityVector),
+        userId: user.username
+      });
       
-      // Here you can add code to display the generated study sessions
-      // or navigate to a page that shows them
+      console.log('Raw API response:', result);
       
-      return preferenceVector;
+      if (result.data) {
+        try {
+          // Log the raw data for debugging
+          console.log('Raw data type:', typeof result.data);
+          console.log('Raw data:', result.data);
+          
+          let studySessions;
+          
+          try {
+            // Try to parse the data as JSON
+            const parsedData = JSON.parse(result.data);
+            console.log('Parsed data:', parsedData);
+            
+            if (parsedData && typeof parsedData === 'object') {
+              // The data appears to be in parsedData.data as a string
+              if (parsedData.data && typeof parsedData.data === 'string') {
+                try {
+                  // Parse the nested JSON string
+                  studySessions = JSON.parse(parsedData.data);
+                  console.log('Parsed nested data:', studySessions);
+                } catch (nestedError) {
+                  console.error('Error parsing nested data:', nestedError);
+                  createTestStudySessions();
+                  return;
+                }
+              } else if (Array.isArray(parsedData)) {
+                studySessions = parsedData;
+              } else {
+                // If we can't find an array, create test sessions
+                console.error('Could not find array in parsed data:', parsedData);
+                createTestStudySessions();
+                return;
+              }
+            } else {
+              studySessions = parsedData;
+            }
+          } catch (jsonError) {
+            console.error('Error parsing JSON:', jsonError);
+            // If it's not valid JSON, use the raw data
+            studySessions = result.data;
+          }
+          
+          // If we have study sessions and they're an array, process them
+          if (Array.isArray(studySessions)) {
+            // Convert the study sessions to Event objects
+            const studyEvents: Event[] = studySessions.map((session, index) => {
+              // Get the day of week
+              const dayMap: {[key: string]: number} = {
+                'Monday': 0,
+                'Tuesday': 1,
+                'Wednesday': 2,
+                'Thursday': 3,
+                'Friday': 4,
+                'Saturday': 5,
+                'Sunday': 6
+              };
+              
+              const dayIndex = dayMap[session.day];
+              
+              // Parse the time strings
+              const [startHour, startMinute] = session.startTime.split(':').map(Number);
+              const [endHour, endMinute] = session.endTime.split(':').map(Number);
+              
+              // Create date objects for the current week
+              const startDate = new Date(currentWeekStart);
+              startDate.setDate(currentWeekStart.getDate() + dayIndex);
+              startDate.setHours(startHour, startMinute || 0, 0, 0);
+              
+              const endDate = new Date(currentWeekStart);
+              endDate.setDate(currentWeekStart.getDate() + dayIndex);
+              endDate.setHours(endHour, endMinute || 0, 0, 0);
+              
+              const now = new Date().toISOString();
+              
+              return {
+                id: `study-${Date.now()}-${index}`,
+                title: `Study: ${session.course || 'General'}`,
+                description: `Study session for ${session.course || 'general topics'}`,
+                type: 'STUDY',
+                startDate: startDate.toISOString(),
+                endDate: endDate.toISOString(),
+                createdAt: now,
+                updatedAt: now
+              };
+            });
+            
+            console.log('Created study events:', studyEvents);
+            
+            if (studyEvents.length > 0) {
+              // Update state with the generated study sessions
+              setGeneratedStudySessions(studyEvents);
+            } else {
+              console.log('No study sessions returned, using fallback');
+              createTestStudySessions();
+            }
+          } else {
+            console.error('Study sessions is not an array:', studySessions);
+            createTestStudySessions();
+          }
+        } catch (error) {
+          console.error('Error processing study sessions:', error);
+          createTestStudySessions();
+        }
+      } else {
+        console.error('No data returned from API');
+        createTestStudySessions();
+      }
     } catch (error) {
       console.error('Error generating study sessions:', error);
+      createTestStudySessions();
     }
   };
+
+  // Add this helper function outside the main function
+  function createTestStudySessions() {
+    const testStudySessions: Event[] = [];
+    
+    // Create one study session for each weekday at different times
+    for (let dayIndex = 0; dayIndex < 5; dayIndex++) {
+      const startDate = new Date(currentWeekStart);
+      startDate.setDate(currentWeekStart.getDate() + dayIndex);
+      startDate.setHours(10 + dayIndex, 0, 0, 0); // Different hour each day
+      
+      const endDate = new Date(startDate);
+      endDate.setHours(startDate.getHours() + 2, 0, 0, 0); // 2-hour sessions
+      
+      const now = new Date().toISOString();
+      
+      testStudySessions.push({
+        id: `study-test-${dayIndex}`,
+        title: `Test Study Session ${dayIndex + 1}`,
+        description: 'Test generated study session',
+        type: 'STUDY',
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        createdAt: now,
+        updatedAt: now
+      });
+    }
+    
+    console.log('Created test study events as fallback:', testStudySessions);
+    
+    // Update state with the test study sessions
+    setGeneratedStudySessions(testStudySessions);
+  }
 
   return (
     <div className="weekly-schedule">
@@ -160,6 +310,14 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events }) => {
         >
           Generate Study Sessions
         </button>
+        {generatedStudySessions.length > 0 && (
+          <button 
+            className="clear-sessions-btn"
+            onClick={() => setGeneratedStudySessions([])}
+          >
+            Clear Study Sessions
+          </button>
+        )}
       </div>
       <div className="schedule-grid">
         <div className="time-column">

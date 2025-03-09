@@ -1,14 +1,11 @@
+// Remove the generateWeekVector function if it's no longer needed
+// Keep any other utility functions that might be in this file
+
 import { generateClient } from 'aws-amplify/api';
 import type { Schema } from "../../amplify/data/resource";
 
 const client = generateClient<Schema>();
 
-/**
- * Generates a weekly preference vector based on availability and user preferences
- * @param availabilityVector An array of 0s and 1s representing availability (0 = busy, 1 = available)
- * @param userId The user ID to fetch preferences for
- * @returns A promise that resolves to the preference vector string
- */
 export const generateWeekVector = async (availabilityVector: number[], userId: string): Promise<string> => {
   try {
     // Convert the availability vector to a string

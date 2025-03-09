@@ -21,6 +21,8 @@ export const handler: Schema["generateStudySessions"]["functionHandler"] = async
   console.log('generateStudySessions handler called with arguments:', JSON.stringify(event.arguments));
   
   const { preferenceVector, userId } = event.arguments;
+
+  console.log('preferenceVector:', preferenceVector);
   
   // Define weekdays
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -50,8 +52,10 @@ export const handler: Schema["generateStudySessions"]["functionHandler"] = async
   // Default values if no preferences are found
   const maxHoursPerDay = studyPreference?.maxHoursPerDay || 4;
   const courses = studyPreference?.courses || [];
+  const totalStudyHours = 20;
   
   console.log('Using maxHoursPerDay:', maxHoursPerDay);
+  console.log('Using totalStudyHours:', totalStudyHours);
   console.log('Available courses:', courses);
   
   // Determine which days have available slots based on preference vector
@@ -70,33 +74,40 @@ export const handler: Schema["generateStudySessions"]["functionHandler"] = async
   
   // Generate study sessions for available days using the renamed import
   console.log('Generating study sessions...');
-  const generatedSessions = scheduleGenerator(availableDays);
-  console.log('Generated raw sessions:', JSON.stringify(generatedSessions));
+  const rawSessions = scheduleGenerator(availableDays, weekVector, {
+    maxDailyHours: maxHoursPerDay,
+    totalStudyHours: totalStudyHours
+  });
+  console.log('Generated raw sessions:', JSON.stringify(rawSessions, null, 2));
   
   // Convert the generated sessions to a format that includes course information
-  const finalSessions = generatedSessions.map((session, index) => {
-    // Assign courses in a round-robin fashion if available
-    const courseIndex = index % courses.length;
-    const course = courses.length > 0 ? courses[courseIndex] : "Study Session";
-    
-    // Convert 0-indexed hour to actual time (assuming 8am start)
+  // Limit the number of sessions to totalStudyHours
+  const limitedSessions = rawSessions.slice(0, totalStudyHours);
+  console.log('Limited to', limitedSessions.length, 'sessions out of', rawSessions.length);
+
+  const formattedSessions = limitedSessions.map((session, index) => {
+    // Map the hour (0-11) to a reasonable daytime hour (8am-7pm)
     const startHour = session.hour + 8;
     const endHour = startHour + 1;
     
+    // Format with leading zeros
+    const startTime = `${String(startHour).padStart(2, '0')}:00`;
+    const endTime = `${String(endHour).padStart(2, '0')}:00`;
+    
     return {
       day: session.day,
-      startTime: `${startHour}:00`,
-      endTime: `${endHour}:00`,
-      course: course
+      startTime,
+      endTime,
+      course: courses[index % courses.length]
     };
   });
   
-  console.log('Final formatted sessions:', JSON.stringify(finalSessions));
+  console.log('Final formatted sessions:', JSON.stringify(formattedSessions));
   
   // Convert the array back to a JSON string before returning
   // This is necessary because the function type expects a string return value
-  const result = JSON.stringify(finalSessions);
-  console.log('Returning result with', finalSessions.length, 'sessions');
+  const result = JSON.stringify(formattedSessions);
+  console.log('Returning result with', formattedSessions.length, 'sessions');
   return result;
 };
   
