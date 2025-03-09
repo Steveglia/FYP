@@ -17,10 +17,10 @@ export const generateWeekVector = async (availabilityVector: number[], userId: s
     // Call the API to generate the preference vector
     const result = await client.queries.generatePreferenceVector({
       availabilityVector: vectorString,
-      userId
+      userId: userId
     });
     
-    return result.data || '[]';
+    return result.data || JSON.stringify(availabilityVector);
   } catch (error) {
     console.error('Error generating preference vector:', error);
     return JSON.stringify(availabilityVector);

@@ -1,6 +1,7 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 import { store_events } from "../functions/storeEvents/resource";
 import { generatePreferenceVector } from "../functions/generatePreferenceVector/resource";
+import { generateStudySessions } from "../functions/generateStudySessions/resource";
 
 const schema = a
   .schema({
@@ -10,12 +11,22 @@ const schema = a
         availabilityVector: a.string(),
         userId: a.string(),
       })
-      .returns(a.string())
+      .returns(
+        a.string()
+      )
       .handler(a.handler.function(generatePreferenceVector))
-      .authorization(
-        allow => [
-          allow.publicApiKey()]
-      ),
+      .authorization(allow => [allow.publicApiKey()]),
+      
+    generateStudySessions: a
+      .query()
+      .arguments({
+        preferenceVector: a.string(),
+        userId: a.string(),
+      })
+      .returns(a.string())
+      .handler(a.handler.function(generateStudySessions))
+      .authorization(allow => [allow.publicApiKey()]),
+
     CalendarEvent: a
       .model({
         title: a.string(),
@@ -38,9 +49,11 @@ const schema = a
         courses: a.string().array()
       })
       .authorization(allow => [allow.publicApiKey()]),
+
   })
   .authorization(allow => [
     allow.resource(store_events)])
+
   ;
 
 export type Schema = ClientSchema<typeof schema>;

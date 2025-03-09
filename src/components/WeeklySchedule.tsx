@@ -135,7 +135,7 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events }) => {
     try {
       // Pass the availability vector and userId to generate the preference vector
       const preferenceVector = await generateWeekVector(availabilityVector, user.username);
-      console.log('Generated preference vector:', preferenceVector);
+      console.log('Study sessions:', preferenceVector);
       
       // Here you can add code to display the generated study sessions
       // or navigate to a page that shows them

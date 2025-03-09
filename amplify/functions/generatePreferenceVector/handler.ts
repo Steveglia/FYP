@@ -77,6 +77,26 @@ export const handler: Schema["generatePreferenceVector"]["functionHandler"] = as
   // Convert the vector to a string
   const preferenceVectorString = JSON.stringify(weekVector);
   
-  // Return just the preference vector to the client
-  return preferenceVectorString;
+  // Initialize studySessions variable
+  let studySessions = null;
+  
+  // Generate study sessions using the preference vector
+  try {
+    console.log('Initiating study sessions generation for user:', userId);
+    
+    // Make the API call and wait for it to complete
+    const result = await client.queries.generateStudySessions({
+      preferenceVector: preferenceVectorString,
+      userId: userId || ''
+    });
+    
+    console.log('Successfully generated study sessions:', result);
+    studySessions = result;
+  } catch (error) {
+    // Log the error but don't fail the function
+    console.error('Error generating study sessions:', error);
+  }
+  
+  
+  return JSON.stringify(studySessions);
 };
