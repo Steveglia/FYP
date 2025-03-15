@@ -2,7 +2,14 @@ import { useMemo, useState, useEffect } from 'react';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { Event, ScheduleEvent, weekDays, hours } from './types';
 import { getMondayOfCurrentWeek } from './utils';
-import { fetchEvents, fetchLectures, generateStudySessions } from './scheduleService';
+import { 
+  fetchEvents, 
+  fetchLectures, 
+  generateStudySessions, 
+  saveAcceptedStudySession,
+  fetchAcceptedStudySessions,
+  deleteAcceptedStudySessions
+} from './scheduleService';
 import ScheduleNavigation from './ScheduleNavigation';
 import ScheduleGrid from './ScheduleGrid';
 import ScheduleLegend from './ScheduleLegend';
@@ -36,8 +43,14 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialEvents =
   // Add state for loading (only used for study session generation now)
   const [isLoading, setIsLoading] = useState(false);
   
+  // Add state to track the type of loading operation
+  const [loadingType, setLoadingType] = useState<'generate' | 'accept' | 'regenerate' | null>(null);
+  
   // Add state for error
   const [error, setError] = useState<string | null>(null);
+  
+  // Add state to track if there are accepted study sessions for the current week
+  const [hasAcceptedSessions, setHasAcceptedSessions] = useState(false);
   
   // Initialize with initial events
   useEffect(() => {
@@ -72,8 +85,18 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialEvents =
         const fetchedEvents = await fetchEvents(currentWeekStart, currentUserId);
         console.log('Fetched events:', fetchedEvents.length);
         
-        if (fetchedEvents.length > 0) {
-          setEvents(fetchedEvents);
+        // Fetch accepted study sessions for the current week
+        const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, currentUserId);
+        console.log('Fetched accepted study sessions:', acceptedStudySessions.length);
+        
+        // Update hasAcceptedSessions state
+        setHasAcceptedSessions(acceptedStudySessions.length > 0);
+        
+        // Combine regular events with accepted study sessions
+        const combinedEvents = [...fetchedEvents, ...acceptedStudySessions];
+        
+        if (combinedEvents.length > 0) {
+          setEvents(combinedEvents);
         } else if (initialEvents.length > 0 && events.length === 0) {
           // If no events were fetched but we have initial events, use those
           console.log('Using initial events as fallback');
@@ -217,9 +240,15 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialEvents =
             // Add the event to the schedule
             for (let hour = startHour; hour <= Math.min(endHour, 22); hour++) {
               if (hour >= 8 && schedule[day] && schedule[day][hour]) {
+                // Check if this is an accepted study session
+                const isAcceptedStudySession = 
+                  event.type === 'STUDY' && 
+                  !generatedStudySessions.some(s => s.id === event.id);
+                
                 const scheduleEvent: ScheduleEvent = {
                   ...event,
-                  isStart: hour === startHour
+                  isStart: hour === startHour,
+                  isAcceptedStudySession
                 };
                 schedule[day][hour].push(scheduleEvent);
               }
@@ -242,7 +271,7 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialEvents =
     console.log(`${eventsInRange} events in current week range (${eventsOutsideHours} outside display hours)`);
     
     return schedule;
-  }, [allEvents, currentWeekStart]);
+  }, [allEvents, currentWeekStart, generatedStudySessions]);
 
   // Add navigation functions
   const navigateWeek = (direction: 'prev' | 'next') => {
@@ -262,6 +291,7 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialEvents =
     }
     
     setIsLoading(true);
+    setLoadingType('generate');
     setError(null);
     
     try {
@@ -289,6 +319,56 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialEvents =
       setError('Failed to generate study sessions. Please try again later.');
     } finally {
       setIsLoading(false);
+      setLoadingType(null);
+    }
+  };
+
+  // Delete accepted study sessions and regenerate
+  const handleRegenerateStudySessions = async () => {
+    if (!user) {
+      setError('You must be logged in to regenerate study sessions.');
+      return;
+    }
+    
+    setIsLoading(true);
+    setLoadingType('regenerate');
+    setError(null);
+    
+    try {
+      // First delete all accepted study sessions for the current week
+      console.log('Deleting accepted study sessions for week starting:', formatWeekDate(currentWeekStart));
+      await deleteAcceptedStudySessions(currentWeekStart, user.username);
+      
+      // Update the events list to remove the deleted sessions
+      const fetchedEvents = await fetchEvents(currentWeekStart, user.username);
+      setEvents(fetchedEvents);
+      
+      // Set hasAcceptedSessions to false since we've deleted them
+      setHasAcceptedSessions(false);
+      
+      // Now generate new study sessions
+      console.log('Regenerating study sessions for user:', user.username);
+      
+      const studySessions = await generateStudySessions(
+        currentWeekStart,
+        fetchedEvents, // Use the updated events list
+        lectures,
+        user.username
+      );
+      
+      console.log('Regenerated study sessions:', studySessions.length);
+      
+      if (studySessions.length === 0) {
+        setError('No suitable study times found. Try adding more free time to your schedule.');
+      } else {
+        setGeneratedStudySessions(studySessions);
+      }
+    } catch (err) {
+      console.error('Error regenerating study sessions:', err);
+      setError('Failed to regenerate study sessions. Please try again later.');
+    } finally {
+      setIsLoading(false);
+      setLoadingType(null);
     }
   };
 
@@ -372,28 +452,70 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialEvents =
     setEvents(testEvents);
   };
 
+  // Handle accepting all study sessions
+  const handleAcceptAllSessions = async () => {
+    if (!user || generatedStudySessions.length === 0) return;
+    
+    setIsLoading(true);
+    setLoadingType('accept');
+    try {
+      console.log('Accepting all study sessions:', generatedStudySessions.length);
+      
+      // Save each session to the database
+      const savePromises = generatedStudySessions.map(session => 
+        saveAcceptedStudySession(session, user.username, currentWeekStart)
+      );
+      
+      await Promise.all(savePromises);
+      
+      // Clear the generated sessions since they've been accepted
+      setGeneratedStudySessions([]);
+      
+      // Fetch both regular events and accepted study sessions
+      const currentUserId = user.username || userId;
+      const fetchedEvents = await fetchEvents(currentWeekStart, currentUserId);
+      const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, currentUserId);
+      
+      // Update hasAcceptedSessions state
+      setHasAcceptedSessions(acceptedStudySessions.length > 0);
+      
+      // Combine them and update the state
+      const combinedEvents = [...fetchedEvents, ...acceptedStudySessions];
+      setEvents(combinedEvents);
+      
+      console.log('All study sessions accepted successfully');
+      console.log('Updated events count:', combinedEvents.length);
+    } catch (error) {
+      console.error('Error accepting study sessions:', error);
+      setError('Failed to accept study sessions. Please try again.');
+    } finally {
+      setIsLoading(false);
+      setLoadingType(null);
+    }
+  };
+
   return (
     <div className="weekly-schedule">
-      <ScheduleNavigation 
-        currentWeekStart={currentWeekStart}
-        navigateWeek={navigateWeek}
-        handleGenerateStudySessions={handleGenerateStudySessions}
-        hasGeneratedSessions={generatedStudySessions.length > 0}
-        clearStudySessions={clearStudySessions}
-      />
-      
-      {/* Only show loading indicator for study session generation */}
-      {isLoading && (
-        <div className="loading-indicator">
-          Generating study sessions...
-        </div>
-      )}
-      
-      {error && (
-        <div className="error-message">
-          {error}
-        </div>
-      )}
+      <div className="schedule-controls">
+        <ScheduleNavigation 
+          currentWeekStart={currentWeekStart}
+          navigateWeek={navigateWeek}
+          handleGenerateStudySessions={handleGenerateStudySessions}
+          handleRegenerateStudySessions={handleRegenerateStudySessions}
+          hasGeneratedSessions={generatedStudySessions.length > 0}
+          hasAcceptedSessions={hasAcceptedSessions}
+          clearStudySessions={clearStudySessions}
+          handleAcceptAllSessions={handleAcceptAllSessions}
+          isLoading={isLoading}
+          loadingType={loadingType}
+        />
+        
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
+      </div>
       
       <ScheduleGrid eventsByDayAndTime={eventsByDayAndTime} />
       <ScheduleLegend />

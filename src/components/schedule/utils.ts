@@ -19,6 +19,11 @@ export const calculateEventHeight = (event: ScheduleEvent): string => {
 
 // Function to determine event color based on event data
 export const getEventColor = (event: ScheduleEvent): string => {
+  // Check if it's an accepted study session
+  if (event.isAcceptedStudySession) {
+    return '#4caf50'; // Green color for accepted study sessions
+  }
+  
   // Check if it's a lab by looking at the isLab property or other indicators
   if (event.isLab || 
       event.id?.includes('lab-') || 

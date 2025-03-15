@@ -13,6 +13,7 @@ export interface Event extends BaseEvent {
 
 export interface ScheduleEvent extends Event {
   isStart?: boolean;
+  isAcceptedStudySession?: boolean;
 }
 
 // Event type definitions

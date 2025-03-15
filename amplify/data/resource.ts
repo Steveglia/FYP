@@ -68,6 +68,22 @@ const schema = a
       })
       .authorization(allow => [allow.publicApiKey()]),
 
+    AcceptedStudySession: a
+      .model({
+        day: a.string(),
+        startTime: a.string(),
+        endTime: a.string(),
+        course: a.string(),
+        startDate: a.string(),
+        endDate: a.string(),
+        userId: a.string(),
+        weekStartDate: a.string(),
+        title: a.string(),
+        description: a.string(),
+        type: a.enum(['STUDY']),
+      })
+      .authorization(allow => [allow.publicApiKey()]),
+
   })
   .authorization(allow => [
     allow.resource(store_events),

@@ -44,11 +44,11 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({ eventsByDayAndTime }) => {
                 .map(event => (
                   <div 
                     key={event.id} 
-                    className="event-item"
+                    className={`event-item ${event.isAcceptedStudySession ? 'accepted-study' : ''}`}
                     style={{ 
                       height: calculateEventHeight(event),
                       marginTop: '2px',
-                      backgroundColor: getEventColor(event),
+                      backgroundColor: event.isAcceptedStudySession ? '#4caf50' : getEventColor(event),
                       color: '#ffffff',
                       padding: '4px',
                       borderRadius: '4px',

@@ -5,6 +5,94 @@ import { createTestStudySessions } from './utils';
 
 const client = generateClient<Schema>();
 
+// Save an accepted study session to the database
+export const saveAcceptedStudySession = async (studySession: Event, userId: string, weekStartDate: Date): Promise<boolean> => {
+  try {
+    if (!studySession || !userId || !studySession.startDate || !studySession.endDate || !studySession.title) {
+      console.error('Invalid study session or user ID');
+      return false;
+    }
+    
+    // Extract day name from the date
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const sessionDate = new Date(studySession.startDate);
+    const day = dayNames[sessionDate.getDay()];
+    
+    // Format times
+    const startTime = `${String(sessionDate.getHours()).padStart(2, '0')}:${String(sessionDate.getMinutes()).padStart(2, '0')}`;
+    
+    const endDate = new Date(studySession.endDate);
+    const endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+    
+    // Extract course from title (format is "Study: Course Name")
+    const title = studySession.title || '';
+    const course = title.startsWith('Study: ') 
+      ? title.substring(7) 
+      : title;
+    
+    // Create the accepted study session record
+    const result = await client.models.AcceptedStudySession.create({
+      day,
+      startTime,
+      endTime,
+      course,
+      startDate: studySession.startDate,
+      endDate: studySession.endDate,
+      userId,
+      weekStartDate: weekStartDate.toISOString(),
+      title: studySession.title,
+      description: studySession.description || '',
+      type: 'STUDY'
+    });
+    
+    console.log('Study session accepted and saved:', result);
+    return true;
+  } catch (error) {
+    console.error('Error saving accepted study session:', error);
+    return false;
+  }
+};
+
+// Fetch accepted study sessions for a specific week and user
+export const fetchAcceptedStudySessions = async (weekStartDate: Date, userId: string): Promise<Event[]> => {
+  try {
+    const weekStartStr = weekStartDate.toISOString();
+    
+    // Calculate week end date
+    const weekEndDate = new Date(weekStartDate);
+    weekEndDate.setDate(weekStartDate.getDate() + 7);
+    
+    // Query accepted study sessions for the current week and user
+    const result = await client.models.AcceptedStudySession.list({
+      filter: {
+        and: [
+          { weekStartDate: { eq: weekStartStr } },
+          { userId: { eq: userId } }
+        ]
+      }
+    });
+    
+    if (result.data && result.data.length > 0) {
+      // Convert to Event format
+      return result.data.map(session => ({
+        id: session.id,
+        title: session.title,
+        description: session.description,
+        type: 'STUDY',
+        startDate: session.startDate,
+        endDate: session.endDate,
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt
+      }));
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Error fetching accepted study sessions:', error);
+    return [];
+  }
+};
+
 // Fetch events for the current week
 export const fetchEvents = async (currentWeekStart: Date, userId: string): Promise<Event[]> => {
   try {
@@ -74,9 +162,6 @@ export const fetchLectures = async (currentWeekStart: Date): Promise<Event[]> =>
                      lecture.content?.toLowerCase().includes('lab') ||
                      lecture.summary?.toLowerCase().includes('lab');
         
-        // Log the raw lecture data for debugging
-        console.log('Raw lecture data:', JSON.stringify(lecture, null, 2));
-        
         // Ensure we have valid start and end dates
         let startDate = lecture.start_date;
         let endDate = lecture.end_date;
@@ -86,8 +171,6 @@ export const fetchLectures = async (currentWeekStart: Date): Promise<Event[]> =>
           console.error('Invalid lecture data - missing start or end date:', lecture);
           continue;
         }
-        
-        console.log(`Lecture: ${lecture.title}, Start: ${startDate}, End: ${endDate}`);
         
         // Create the event object
         const event: Event = {
@@ -129,14 +212,8 @@ export const fetchLectures = async (currentWeekStart: Date): Promise<Event[]> =>
         if (!seen.has(key)) {
           seen.add(key);
           uniqueLectures.push(event);
-        } else {
-          console.log(`Removing duplicate lecture: ${event.title}`);
         }
       });
-      
-      console.log('Fetched lectures for current week:', uniqueLectures.length);
-      console.log('Labs identified:', uniqueLectures.filter(event => event.isLab).length);
-      console.log('Lectures identified:', uniqueLectures.filter(event => event.isLecture).length);
       
       return uniqueLectures;
     }
@@ -164,7 +241,6 @@ export const generateStudySessions = async (
     const endDateStr = weekEndDate.toISOString();
     
     // Fetch events directly from the database for the current week
-    console.log('Fetching events directly from database for week:', startDateStr, 'to', endDateStr);
     const eventsResult = await client.models.CalendarEvent.list({
       filter: {
         and: [
@@ -175,7 +251,6 @@ export const generateStudySessions = async (
     });
     
     // Fetch lectures directly from the database for the current week
-    console.log('Fetching lectures directly from database for week:', startDateStr, 'to', endDateStr);
     const lecturesResult = await client.models.Lectures.list({
       filter: {
         and: [
@@ -196,9 +271,6 @@ export const generateStudySessions = async (
                      lecture.content?.toLowerCase().includes('lab') ||
                      lecture.summary?.toLowerCase().includes('lab');
         
-        // Log the raw lecture data for debugging
-        console.log('Raw lecture data:', JSON.stringify(lecture, null, 2));
-        
         // Ensure we have valid start and end dates
         let startDate = lecture.start_date;
         let endDate = lecture.end_date;
@@ -208,8 +280,6 @@ export const generateStudySessions = async (
           console.error('Invalid lecture data - missing start or end date:', lecture);
           continue;
         }
-        
-        console.log(`Lecture: ${lecture.title}, Start: ${startDate}, End: ${endDate}`);
         
         // Create the event object
         const event: Event = {
@@ -253,12 +323,6 @@ export const generateStudySessions = async (
           const startDate = new Date(startDateStr);
           const endDate = new Date(endDateStr);
           
-          console.log(`Processing event: ${event.title}`);
-          console.log(`  Original start: ${event.startDate}`);
-          console.log(`  Original end: ${event.endDate}`);
-          console.log(`  Parsed start: ${startDate.toLocaleString()} (${startDate.toLocaleTimeString()})`);
-          console.log(`  Parsed end: ${endDate.toLocaleString()} (${endDate.toLocaleTimeString()})`);
-          
           // Get the day of week for the start date (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
           const startDayOfWeek = startDate.getDay();
           // Convert to our index (0 = Monday, ..., 6 = Sunday)
@@ -273,16 +337,12 @@ export const generateStudySessions = async (
             endHour = Math.max(8, endHour - 1);
           }
           
-          const dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][dayIndex];
-          console.log(`  Day: ${dayName}, Hours: ${startHour}:00-${endHour + 1}:00`);
-          
           // Mark time slots as unavailable
           for (let hour = startHour; hour <= Math.min(endHour, 22); hour++) {
             if (hour >= 8 && hour <= 22) {
               const vectorIndex = (dayIndex * 15) + (hour - 8);
               if (vectorIndex >= 0 && vectorIndex < availabilityVector.length) {
                 availabilityVector[vectorIndex] = 0; // Mark as unavailable
-                console.log(`    Marked unavailable: Slot ${vectorIndex}, Hour ${hour} (${hour}:00-${hour+1}:00)`);
               }
             }
           }
@@ -292,23 +352,6 @@ export const generateStudySessions = async (
       }
     });
     
-    // Log the availability vector for debugging
-    console.log('Availability vector by day:');
-    for (let day = 0; day < 7; day++) {
-      const dayVector = availabilityVector.slice(day * 15, (day + 1) * 15);
-      const dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][day];
-      console.log(`${dayName}: ${dayVector.join(' ')}`);
-      
-      // Log the hour mapping for the first day to verify
-      if (day === 0) {
-        console.log('Hour mapping for Monday:');
-        dayVector.forEach((value, index) => {
-          const hour = index + 8;
-          console.log(`  ${hour}:00-${hour+1}:00: ${value}`);
-        });
-      }
-    }
-    
     try {
       // Call generatePreferenceVector API
       const result = await client.queries.generatePreferenceVector({
@@ -316,20 +359,13 @@ export const generateStudySessions = async (
         userId
       });
       
-      console.log('Raw API response:', result);
-      
       if (result.data) {
         try {
-          // Log the raw data for debugging
-          console.log('Raw data type:', typeof result.data);
-          console.log('Raw data:', result.data);
-          
           let studySessions;
           
           try {
             // Try to parse the data as JSON
             const parsedData = JSON.parse(result.data);
-            console.log('Parsed data:', parsedData);
             
             if (parsedData && typeof parsedData === 'object') {
               // The data appears to be in parsedData.data as a string
@@ -337,7 +373,6 @@ export const generateStudySessions = async (
                 try {
                   // Parse the nested JSON string
                   studySessions = JSON.parse(parsedData.data);
-                  console.log('Parsed nested data:', studySessions);
                 } catch (nestedError) {
                   console.error('Error parsing nested data:', nestedError);
                   return createTestStudySessions(currentWeekStart);
@@ -407,10 +442,6 @@ export const generateStudySessions = async (
                 const utcEndDate = new Date(endDate.getTime() - tzOffset);
                 const endDateIso = utcEndDate.toISOString();
                 
-                console.log(`Study session: ${session.day} ${session.startTime}-${session.endTime}`);
-                console.log(`  Local time: ${startDate.toLocaleTimeString()}-${endDate.toLocaleTimeString()}`);
-                console.log(`  ISO string: ${startDateIso}-${endDateIso}`);
-                
                 const now = new Date().toISOString();
                 
                 return {
@@ -429,8 +460,6 @@ export const generateStudySessions = async (
               }
             }).filter(Boolean) as Event[];
             
-            console.log('Created study events:', studyEvents);
-            
             if (studyEvents.length > 0) {
               return studyEvents;
             }
@@ -447,6 +476,43 @@ export const generateStudySessions = async (
   }
   
   // Fallback to test study sessions
-  console.log('Falling back to test study sessions');
   return createTestStudySessions(currentWeekStart);
+};
+
+// Delete all accepted study sessions for a specific week
+export const deleteAcceptedStudySessions = async (weekStartDate: Date, userId: string): Promise<boolean> => {
+  try {
+    const weekStartStr = weekStartDate.toISOString();
+    
+    // Query accepted study sessions for the current week and user
+    const result = await client.models.AcceptedStudySession.list({
+      filter: {
+        and: [
+          { weekStartDate: { eq: weekStartStr } },
+          { userId: { eq: userId } }
+        ]
+      }
+    });
+    
+    if (result.data && result.data.length > 0) {
+      console.log(`Found ${result.data.length} accepted study sessions to delete`);
+      
+      // Delete each session
+      const deletePromises = result.data.map(session => 
+        client.models.AcceptedStudySession.delete({
+          id: session.id
+        })
+      );
+      
+      await Promise.all(deletePromises);
+      console.log(`Successfully deleted ${result.data.length} accepted study sessions`);
+      return true;
+    } else {
+      console.log('No accepted study sessions found to delete');
+      return false;
+    }
+  } catch (error) {
+    console.error('Error deleting accepted study sessions:', error);
+    return false;
+  }
 }; 
