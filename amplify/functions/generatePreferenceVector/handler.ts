@@ -4,14 +4,13 @@ import { generateClient } from 'aws-amplify/api';
 
 let outputs: any;
 try {
-  // Dynamically require the outputs; this will run at runtime
   outputs = require("../../../amplify_outputs.json");
 } catch (err) {
-  // Handle the case where the file is not yet available
   console.log('Amplify outputs not available:', err);
   outputs = {};
 }
 
+// Use the outputs directly - they already have the correct structure
 Amplify.configure(outputs);
 
 const client = generateClient<Schema>();

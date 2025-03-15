@@ -47,26 +47,64 @@ interface Config {
   
   /**
    * Helper function to adjust a solution so that it has exactly requiredOnes ones.
+   * This ensures we always have exactly the required number of study sessions.
    */
-  function adjustSolution(solution: number[], requiredOnes: number): number[] {
+  function adjustSolution(solution: number[], requiredOnes: number, preferences?: number[]): number[] {
     let currentOnes = solution.reduce((sum, val) => sum + val, 0);
+    
+    // If already correct, return as is
+    if (currentOnes === requiredOnes) {
+      return solution;
+    }
+    
+    // Create a copy to avoid modifying the original
+    const adjustedSolution = [...solution];
+    
+    // Get indices with preference values for better selection
     const indices = [...Array(solution.length).keys()];
-  
-    // If there are too many ones, randomly switch some 1s to 0s.
-    while (currentOnes > requiredOnes) {
-      const onesIndices = indices.filter(i => solution[i] === 1);
-      const removeIdx = onesIndices[Math.floor(Math.random() * onesIndices.length)];
-      solution[removeIdx] = 0;
-      currentOnes--;
+
+    // If there are too many ones, remove from lowest preference slots
+    if (currentOnes > requiredOnes) {
+      // Sort indices of ones by preference (lowest first)
+      const onesIndices = indices
+        .filter(i => adjustedSolution[i] === 1)
+        .sort((a, b) => {
+          // If preferences are available, use them for sorting
+          if (preferences) {
+            return preferences[a] - preferences[b]; // Sort by ascending preference (remove lowest first)
+          }
+          return Math.random() - 0.5; // Random sort if no preferences
+        });
+      
+      // Remove ones from lowest preference slots
+      while (currentOnes > requiredOnes) {
+        const removeIdx = onesIndices.shift() as number;
+        adjustedSolution[removeIdx] = 0;
+        currentOnes--;
+      }
+    } 
+    // If there are too few ones, add to highest preference slots
+    else if (currentOnes < requiredOnes) {
+      // Sort indices of zeros by preference (highest first)
+      const zeroIndices = indices
+        .filter(i => adjustedSolution[i] === 0)
+        .sort((a, b) => {
+          // If preferences are available, use them for sorting
+          if (preferences) {
+            return preferences[b] - preferences[a]; // Sort by descending preference (add highest first)
+          }
+          return Math.random() - 0.5; // Random sort if no preferences
+        });
+      
+      // Add ones to highest preference slots
+      while (currentOnes < requiredOnes) {
+        const addIdx = zeroIndices.shift() as number;
+        adjustedSolution[addIdx] = 1;
+        currentOnes++;
+      }
     }
-    // If there are too few ones, randomly switch some 0s to 1s.
-    while (currentOnes < requiredOnes) {
-      const zeroIndices = indices.filter(i => solution[i] === 0);
-      const addIdx = zeroIndices[Math.floor(Math.random() * zeroIndices.length)];
-      solution[addIdx] = 1;
-      currentOnes++;
-    }
-    return solution;
+    
+    return adjustedSolution;
   }
   
   /**
@@ -103,31 +141,49 @@ interface Config {
       }
       // Hard Constraint 2: Total study hours must equal REQUIRED_STUDY_HOURS.
       const totalStudyHours = solution.reduce((sum, v) => sum + v, 0);
-      penalties += Math.abs(totalStudyHours - this.config.REQUIRED_STUDY_HOURS) * 1000;
+      // Strong penalty for incorrect number of study hours
+      penalties += Math.abs(totalStudyHours - this.config.REQUIRED_STUDY_HOURS) * 2000;
   
-      // Soft Constraint 1: Penalize single-hour blocks and overly long blocks per day.
+      // Soft Constraint 1: Apply stronger penalties for blocks of 3 or more hours
       for (let day = 0; day < this.config.NUM_DAYS; day++) {
         const start = day * this.config.HOURS_PER_DAY;
         const end = start + this.config.HOURS_PER_DAY;
         const dailySchedule = solution.slice(start, end);
         let blockLength = 0;
-        for (let hour of dailySchedule) {
-          if (hour === 1) {
+        for (let hour = 0; hour < dailySchedule.length; hour++) {
+          // Check if this is a valid hour (8am-7pm, which is hour index 0-11)
+          // This assumes HOURS_PER_DAY = 12 and the hours start at 8am
+          const actualHour = hour + 8; // Convert to actual hour of day
+          
+          if (dailySchedule[hour] === 1) {
+            // EXTREMELY hard penalty for hours before 8am
+            if (actualHour < 8) {
+              penalties += 10000;
+            }
+            // Hard penalty for hours after 7pm
+            else if (actualHour > 19) {
+              penalties += 5000;
+            }
+            
             blockLength++;
           } else if (blockLength > 0) {
             if (blockLength === 1) {
-              penalties += 30;
-            } else if (blockLength > 2) {
-              penalties += (blockLength - 2) * 40;
+              // Mild penalty for single-hour blocks
+              penalties += 20;
+            } else if (blockLength >= 3) {
+              // Stronger penalty for blocks of 3 or more hours
+              penalties += (blockLength - 2) * 200;
             }
             blockLength = 0;
           }
         }
         if (blockLength > 0) {
           if (blockLength === 1) {
-            penalties += 30;
-          } else if (blockLength > 2) {
-            penalties += (blockLength - 2) * 40;
+            // Mild penalty for single-hour blocks
+            penalties += 20;
+          } else if (blockLength >= 3) {
+            // Stronger penalty for blocks of 3 or more hours
+            penalties += (blockLength - 2) * 200;
           }
         }
       }
@@ -138,7 +194,7 @@ interface Config {
         const end = start + this.config.HOURS_PER_DAY;
         const dailyHours = solution.slice(start, end).reduce((sum, v) => sum + v, 0);
         if (dailyHours > this.config.MAX_DAILY_HOURS) {
-          penalties += (dailyHours - this.config.MAX_DAILY_HOURS) * 100;
+          penalties += (dailyHours - this.config.MAX_DAILY_HOURS) * 200;
         }
       }
       return penalties;
@@ -185,7 +241,9 @@ interface Config {
           iterationsWithoutImprovement = 0;
         }
       }
-      return currentSolution;
+      
+      // Ensure the solution still has exactly REQUIRED_STUDY_HOURS ones
+      return adjustSolution(currentSolution, this.config.REQUIRED_STUDY_HOURS, this.fitnessEvaluator.preferences);
     }
   
     generateNeighbor(solution: number[]): number[] {
@@ -246,30 +304,47 @@ interface Config {
     initializePopulation(): number[][] {
       const population: number[][] = [];
       const validIndices: number[] = [];
+      
+      // Find all indices with positive preference
       for (let i = 0; i < this.dimensions; i++) {
         if (this.fitnessEvaluator.preferences[i] > 0) {
           validIndices.push(i);
         }
       }
-      const numValid = validIndices.length;
+      
+      console.log(`Found ${validIndices.length} valid indices out of ${this.dimensions} total`);
+      
+      // If no valid indices, use all indices
+      const indicesForSampling = validIndices.length > 0 ? validIndices : [...Array(this.dimensions).keys()];
+      const numValid = indicesForSampling.length;
+      
+      // Generate LHS samples
       const lhsSamples = lhs(numValid, this.populationSize);
   
       for (let i = 0; i < this.populationSize; i++) {
         const solution = Array(this.dimensions).fill(0);
+        
         // Sort indices by preference value (highest first) and then by LHS sample
-        const sortedIndices = validIndices
-          .slice()
+        const sortedIndices = [...indicesForSampling]
           .sort((a, b) => {
             // First sort by preference value (highest first)
             const prefDiff = this.fitnessEvaluator.preferences[b] - this.fitnessEvaluator.preferences[a];
             if (prefDiff !== 0) return prefDiff;
             // If preferences are equal, use LHS sample
-            return lhsSamples[i][validIndices.indexOf(a)] - lhsSamples[i][validIndices.indexOf(b)];
+            const aIdx = indicesForSampling.indexOf(a);
+            const bIdx = indicesForSampling.indexOf(b);
+            return lhsSamples[i][aIdx] - lhsSamples[i][bIdx];
           });
+        
+        // Select the top REQUIRED_STUDY_HOURS indices
         const selected = sortedIndices.slice(0, this.config.REQUIRED_STUDY_HOURS);
         selected.forEach(idx => (solution[idx] = 1));
-        population.push(solution);
+        
+        // Ensure we have exactly REQUIRED_STUDY_HOURS ones
+        const adjusted = adjustSolution(solution, this.config.REQUIRED_STUDY_HOURS, this.fitnessEvaluator.preferences);
+        population.push(adjusted);
       }
+      
       return population;
     }
   
@@ -312,7 +387,7 @@ interface Config {
           }
           newPos[d] = value > 0.5 ? 1 : 0;
         }
-        newPopulation[i] = adjustSolution(newPos, this.config.REQUIRED_STUDY_HOURS);
+        newPopulation[i] = adjustSolution(newPos, this.config.REQUIRED_STUDY_HOURS, this.fitnessEvaluator.preferences);
       }
   
       // Apply hill climbing to a portion of the population (always include the best).
@@ -406,7 +481,7 @@ interface Config {
     const HOURS_PER_DAY = 12;
     const TOTAL_HOURS = NUM_DAYS * HOURS_PER_DAY;
     const MAX_DAILY_HOURS = options?.maxDailyHours || 4;
-    const REQUIRED_STUDY_HOURS = Math.min(options?.totalStudyHours || 20, TOTAL_HOURS);
+    const REQUIRED_STUDY_HOURS = Math.min(options?.totalStudyHours || 16, TOTAL_HOURS);
   
     const config: Config = {
       NUM_DAYS,

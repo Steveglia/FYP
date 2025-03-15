@@ -1,5 +1,6 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 import { store_events } from "../functions/storeEvents/resource";
+import { store_lectures } from "../functions/storeLectures/resource";
 import { generatePreferenceVector } from "../functions/generatePreferenceVector/resource";
 import { generateStudySessions } from "../functions/generateStudySessions/resource";
 
@@ -37,6 +38,23 @@ const schema = a
         type: a.enum(['WORK', 'STUDY', 'MEETING', 'OTHER']),
       })
       .authorization(allow => [allow.publicApiKey()]),
+
+    Lectures: a
+      .model({
+        courseId: a.string(),
+        lectureId: a.string(),
+        title: a.string(),
+        content: a.string(),
+        summary: a.string(),
+        difficulty: a.string(),
+        duration: a.string(),
+        start_date: a.string(),
+        end_date: a.string(),
+        location: a.string(),
+        type: a.string(),
+      })
+      .authorization(allow => [allow.publicApiKey()]),
+      
       StudyPreference: a
       .model({
         studyTime: a.string(),
@@ -52,7 +70,8 @@ const schema = a
 
   })
   .authorization(allow => [
-    allow.resource(store_events)])
+    allow.resource(store_events),
+    allow.resource(store_lectures)])
 
   ;
 
