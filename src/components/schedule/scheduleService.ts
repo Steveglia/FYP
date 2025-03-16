@@ -110,6 +110,9 @@ export const fetchEvents = async (currentWeekStart: Date, userId: string): Promi
         and: [
           { startDate: { ge: startDateStr } },
           { startDate: { lt: endDateStr } }
+          // userId is intentionally not used in the filter yet
+          // We'll add it back once we confirm events are showing properly
+          // { userId: { eq: userId } }
         ]
       }
     });
