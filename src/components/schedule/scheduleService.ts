@@ -1,6 +1,6 @@
 import { generateClient } from 'aws-amplify/api';
 import type { Schema } from "../../../amplify/data/resource";
-import { Event, EventType } from './types';
+import { Event } from './types';
 import { createTestStudySessions } from './utils';
 
 const client = generateClient<Schema>();
@@ -227,8 +227,8 @@ export const fetchLectures = async (currentWeekStart: Date): Promise<Event[]> =>
 // Generate study sessions based on availability
 export const generateStudySessions = async (
   currentWeekStart: Date,
-  events: Event[],
-  lectures: Event[],
+  currentEvents: Event[],
+  currentLectures: Event[],
   userId: string
 ): Promise<Event[]> => {
   try {
@@ -305,7 +305,7 @@ export const generateStudySessions = async (
     
     // Combine events from database with lectures
     const dbEvents = eventsResult.data || [];
-    const allEvents = [...dbEvents, ...dbLectures];
+    const allEvents = [...dbEvents, ...dbLectures, ...currentEvents, ...currentLectures];
     
     console.log('Total events fetched from database:', allEvents.length);
     
