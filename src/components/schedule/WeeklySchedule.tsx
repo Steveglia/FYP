@@ -53,9 +53,6 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialEvents =
   // Add state to track if there are accepted study sessions for the current week
   const [hasAcceptedSessions, setHasAcceptedSessions] = useState(false);
   
-  // Add state to track accepted study sessions
-  const [acceptedStudySessions, setAcceptedStudySessions] = useState<Event[]>([]);
-  
   // Add state for toast notification
   const [toast, setToast] = useState<{ 
     message: string; 
@@ -101,14 +98,14 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialEvents =
         console.log('Fetched events:', fetchedEvents.length);
         
         // Fetch accepted study sessions for the current week
-        const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, currentUserId);
-        console.log('Fetched accepted study sessions:', acceptedStudySessions.length);
+        const fetchedAcceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, currentUserId);
+        console.log('Fetched accepted study sessions:', fetchedAcceptedStudySessions.length);
         
         // Update hasAcceptedSessions state
-        setHasAcceptedSessions(acceptedStudySessions.length > 0);
+        setHasAcceptedSessions(fetchedAcceptedStudySessions.length > 0);
         
         // Combine regular events with accepted study sessions
-        const combinedEvents = [...fetchedEvents, ...acceptedStudySessions];
+        const combinedEvents = [...fetchedEvents, ...fetchedAcceptedStudySessions];
         
         if (combinedEvents.length > 0) {
           setEvents(combinedEvents);
@@ -489,13 +486,13 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialEvents =
       // Fetch both regular events and accepted study sessions
       const currentUserId = user.username || userId;
       const fetchedEvents = await fetchEvents(currentWeekStart, currentUserId);
-      const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, currentUserId);
+      const fetchedAcceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, currentUserId);
       
       // Update hasAcceptedSessions state
-      setHasAcceptedSessions(acceptedStudySessions.length > 0);
+      setHasAcceptedSessions(fetchedAcceptedStudySessions.length > 0);
       
       // Combine them and update the state
-      const combinedEvents = [...fetchedEvents, ...acceptedStudySessions];
+      const combinedEvents = [...fetchedEvents, ...fetchedAcceptedStudySessions];
       setEvents(combinedEvents);
       
       console.log('All study sessions accepted successfully');
@@ -558,7 +555,6 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialEvents =
       events: events.length,
       lectures: lectures.length,
       generatedStudySessions: generatedStudySessions.length,
-      acceptedStudySessions: acceptedStudySessions.length,
       hasAcceptedSessions,
       allEvents: allEvents.length
     });
@@ -593,7 +589,6 @@ const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialEvents =
           
           // Check if this event spans to or beyond our target hour
           if (event.startDate && event.endDate) {
-            const startDate = new Date(event.startDate);
             const endDate = new Date(event.endDate);
             
             // Calculate the event's end hour

@@ -2,11 +2,12 @@ import React from 'react';
 import WeeklySchedule from './schedule/WeeklySchedule';
 import type { Schema } from "../../amplify/data/resource";
 import { useAuthenticator } from '@aws-amplify/ui-react';
+import { Event as CustomEvent } from './schedule/types';
 
-type Event = Schema["CalendarEvent"]["type"];
+type SchemaEvent = Schema["CalendarEvent"]["type"];
 
 interface WeeklyScheduleWrapperProps {
-  events?: Event[];
+  events?: SchemaEvent[];
   userId?: string;
 }
 
@@ -19,7 +20,20 @@ const WeeklyScheduleWrapper: React.FC<WeeklyScheduleWrapperProps> = ({ events, u
   
   console.log('WeeklyScheduleWrapper - passing events:', events?.length || 0);
   
-  return <WeeklySchedule events={events} userId={effectiveUserId} />;
+  // Convert Schema events to CustomEvent type
+  const convertedEvents = events?.map(event => ({
+    id: event.id || '',
+    title: event.title || '',
+    description: event.description || '',
+    type: event.type || 'OTHER',
+    startDate: event.startDate || '',
+    endDate: event.endDate || '',
+    location: event.location,
+    createdAt: event.createdAt,
+    updatedAt: event.updatedAt
+  } as CustomEvent));
+  
+  return <WeeklySchedule events={convertedEvents} userId={effectiveUserId} />;
 };
 
 export default WeeklyScheduleWrapper; 

@@ -62,7 +62,6 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({ eventsByDayAndTime, onEvent
           // Check if this event spans to or beyond our target hour
           if (event.startDate && event.endDate) {
             // Create date objects that preserve the local time
-            const startDate = new Date(event.startDate);
             const endDate = new Date(event.endDate);
             
             // Calculate the event's end hour and minutes in local time
@@ -111,7 +110,6 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({ eventsByDayAndTime, onEvent
           // Check if this event spans to or beyond our target hour
           if (event.startDate && event.endDate) {
             // Create date objects that preserve the local time
-            const startDate = new Date(event.startDate);
             const endDate = new Date(event.endDate);
             
             // Calculate the event's end hour and minutes in local time
@@ -205,9 +203,6 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({ eventsByDayAndTime, onEvent
   const handleDragOver = (event: React.DragEvent, day: string, hour: number) => {
     // Check if the cell already has events
     const hasEvents = cellHasEvents(day, hour, draggingEventId);
-    
-    // Check if there are any events ending exactly at this hour
-    const hasEventEndingAtHour = hasEventEndingExactlyAtHour(day, hour, draggingEventId);
     
     if (hasEvents) {
       // If the cell has events, set it as an invalid drop target

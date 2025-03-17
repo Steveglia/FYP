@@ -90,7 +90,7 @@ export const createTestStudySessions = (currentWeekStart: Date): Event[] => {
       endDate: endDate.toISOString(),
       createdAt: now,
       updatedAt: now
-    });
+    } as Event); // Type assertion to match Event interface
   }
   
   console.log('Created test study events as fallback:', testStudySessions.length);
