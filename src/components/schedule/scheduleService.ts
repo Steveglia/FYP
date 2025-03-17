@@ -518,4 +518,91 @@ export const deleteAcceptedStudySessions = async (weekStartDate: Date, userId: s
     console.error('Error deleting accepted study sessions:', error);
     return false;
   }
+};
+
+// Update event times when dragged and dropped
+export const updateEventTimes = async (
+  event: Event,
+  newStartDate: string,
+  newEndDate: string
+): Promise<boolean> => {
+  try {
+    if (!event || !event.id || !newStartDate || !newEndDate) {
+      console.error('Invalid event or date parameters');
+      return false;
+    }
+    
+    console.log('Updating event times in database:', {
+      id: event.id,
+      newStartDate,
+      newEndDate
+    });
+    
+    // Check if this is a study session (they're stored in AcceptedStudySession model)
+    if (event.type === 'STUDY') {
+      // Parse the ISO date strings to Date objects
+      const sessionDate = new Date(newStartDate);
+      const endDate = new Date(newEndDate);
+      
+      // Log the parsed dates for debugging
+      console.log('Parsed dates in updateEventTimes:', {
+        sessionDate: sessionDate.toLocaleString(),
+        sessionDateHour: sessionDate.getHours(),
+        endDate: endDate.toLocaleString(),
+        endDateHour: endDate.getHours()
+      });
+      
+      // Extract day name from the date
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const day = dayNames[sessionDate.getDay()];
+      
+      // Format times using local hours
+      const startHours = sessionDate.getHours();
+      const startMinutes = sessionDate.getMinutes();
+      const startTime = `${String(startHours).padStart(2, '0')}:${String(startMinutes).padStart(2, '0')}`;
+      
+      const endHours = endDate.getHours();
+      const endMinutes = endDate.getMinutes();
+      const endTime = `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+      
+      console.log('Updating study session with:', {
+        id: event.id,
+        day,
+        startTime,
+        endTime,
+        startDate: newStartDate,
+        endDate: newEndDate,
+        startHours,
+        startMinutes,
+        endHours,
+        endMinutes
+      });
+      
+      // Update the study session
+      const result = await client.models.AcceptedStudySession.update({
+        id: event.id,
+        day,
+        startTime,
+        endTime,
+        startDate: newStartDate,
+        endDate: newEndDate
+      });
+      
+      console.log('Study session updated:', result);
+      return true;
+    } else {
+      // Update regular calendar event
+      const result = await client.models.CalendarEvent.update({
+        id: event.id,
+        startDate: newStartDate,
+        endDate: newEndDate
+      });
+      
+      console.log('Calendar event updated:', result);
+      return true;
+    }
+  } catch (error) {
+    console.error('Error updating event times:', error);
+    return false;
+  }
 }; 

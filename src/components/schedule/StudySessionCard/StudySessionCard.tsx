@@ -127,9 +127,9 @@ const StudySessionCard: React.FC<StudySessionCardProps> = ({
         )}
         
         {isAccepted && (
-          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-            <Typography variant="body2" color="success.main">
-              ✓ Accepted
+          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+            <Typography variant="body2" color="success.main" sx={{ display: 'flex', alignItems: 'center' }}>
+              ✓ Accepted <span style={{ marginLeft: '4px', fontSize: '14px' }}>&#8645; (Drag to reschedule)</span>
             </Typography>
           </Box>
         )}
