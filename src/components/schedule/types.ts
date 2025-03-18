@@ -4,17 +4,8 @@ import type { Schema } from "../../../amplify/data/resource";
 export type BaseEvent = Schema["CalendarEvent"]["type"];
 export type Lecture = Schema["Lectures"]["type"];
 
-// Define Event as a standalone interface instead of extending BaseEvent
-export interface Event {
-  id: string;
-  title: string;
-  description: string;
-  type: 'WORK' | 'STUDY' | 'MEETING' | 'OTHER';
-  startDate: string;
-  endDate: string;
-  location?: string;
-  createdAt: string;
-  updatedAt: string;
+// Extended event type with additional properties
+export interface Event extends BaseEvent {
   isLecture?: boolean;
   isLab?: boolean;
   userId?: string;

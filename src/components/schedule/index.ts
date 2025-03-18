@@ -1,4 +1,4 @@
-export { default as WeeklySchedule } from './WeeklySchedule';
+export { WeeklySchedule } from './WeeklySchedule';
 export { default as ScheduleGrid } from './ScheduleGrid';
 export { default as ScheduleNavigation } from './ScheduleNavigation';
 export { default as ScheduleLegend } from './ScheduleLegend';

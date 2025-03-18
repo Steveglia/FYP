@@ -1,13 +1,13 @@
 import React from 'react';
-import WeeklySchedule from './schedule/WeeklySchedule';
+import { WeeklySchedule } from './schedule';
 import type { Schema } from "../../amplify/data/resource";
 import { useAuthenticator } from '@aws-amplify/ui-react';
-import { Event as CustomEvent } from './schedule/types';
+import './WeeklySchedule.css';
 
-type SchemaEvent = Schema["CalendarEvent"]["type"];
+type Event = Schema["CalendarEvent"]["type"];
 
 interface WeeklyScheduleWrapperProps {
-  events?: SchemaEvent[];
+  events?: Event[];
   userId?: string;
 }
 
@@ -20,20 +20,22 @@ const WeeklyScheduleWrapper: React.FC<WeeklyScheduleWrapperProps> = ({ events, u
   
   console.log('WeeklyScheduleWrapper - passing events:', events?.length || 0);
   
-  // Convert Schema events to CustomEvent type
-  const convertedEvents = events?.map(event => ({
-    id: event.id || '',
-    title: event.title || '',
-    description: event.description || '',
-    type: event.type || 'OTHER',
-    startDate: event.startDate || '',
-    endDate: event.endDate || '',
-    location: event.location,
-    createdAt: event.createdAt,
-    updatedAt: event.updatedAt
-  } as CustomEvent));
-  
-  return <WeeklySchedule events={convertedEvents} userId={effectiveUserId} />;
+  return (
+    <div className="weekly-schedule-wrapper">
+      {(!events || events.length === 0) && (
+        <div className="instructions-text">
+          <p><strong>Welcome to your Weekly Schedule!</strong></p>
+          <p>This is where you can view your events and generate optimized study sessions based on your availability.</p>
+          <ul>
+            <li>Your course schedule is automatically synchronized and displayed here</li>
+            <li>Use the "<strong>Generate Study Sessions</strong>" button to create AI-optimized study blocks</li>
+            <li>Click on green study sessions to track your learning progress</li>
+          </ul>
+        </div>
+      )}
+      <WeeklySchedule events={events} userId={effectiveUserId} />
+    </div>
+  );
 };
 
 export default WeeklyScheduleWrapper; 

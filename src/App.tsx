@@ -9,6 +9,7 @@ import Home from './pages/Home';
 import Schedule from './pages/Schedule';
 import Preferences from './pages/Preferences';
 import CourseSelection from './components/CourseSelection';
+import { TimeProvider } from './context/TimeContext';
 import './App.css';
 import './components/CourseSelection.css';
 
@@ -84,23 +85,26 @@ function App() {
     }
   }, [user, preferencesInitialized]);
 
+
   const handleCoursesChange = (selectedCourses: string[]) => {
     console.log('Selected courses:', selectedCourses);
     // You can handle the selected courses here, e.g., save to state or send to an API
   };
 
   return (
-    <div className="app">
-      <Navigation />
-      <main className="main-content">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/schedule" element={<Schedule />} />
-          <Route path="/preferences" element={<Preferences />} />
-          <Route path="/courses" element={<CourseSelection onCoursesChange={handleCoursesChange} />} />
-        </Routes>
-      </main>
-    </div>
+    <TimeProvider>
+      <div className="app">
+        <Navigation />
+        <main className="main-content">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/schedule" element={<Schedule />} />
+            <Route path="/preferences" element={<Preferences />} />
+            <Route path="/courses" element={<CourseSelection onCoursesChange={handleCoursesChange} />} />
+          </Routes>
+        </main>
+      </div>
+    </TimeProvider>
   );
 }
 

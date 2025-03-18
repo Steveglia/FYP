@@ -1,18 +1,30 @@
 body {
   margin: 0;
+  padding: 0;
   background: linear-gradient(180deg, rgb(117, 81, 194), rgb(255, 255, 255));
-  display: flex;
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  height: 100vh;
-  width: 100vw;
-  justify-content: center;
-  align-items: center;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  position: relative;
 }
 
 main {
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  width: 100%;
+  min-height: 100vh;
+  position: relative;
+  padding-top: 1rem;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
 }
 
 button {
@@ -35,7 +47,8 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-ul {
+/* Apply these styles only to specific lists, not to all ul elements */
+.app-list {
   padding-inline-start: 0;
   margin-block-start: 0;
   margin-block-end: 0;
@@ -50,12 +63,12 @@ ul {
   overflow: auto;
 }
 
-li {
+.app-list li {
   background-color: white;
   padding: 8px;
 }
 
-li:hover {
+.app-list li:hover {
   background: #dadbf9;
 }
 

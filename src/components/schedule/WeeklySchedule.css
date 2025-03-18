@@ -1,9 +1,12 @@
 .weekly-schedule {
-  margin-top: 20px;
-  padding: 10px;
+  margin-top: 0;
+  margin-bottom: 2rem;
+  padding: 20px;
   background-color: #ffffff;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: visible;
+  box-sizing: border-box;
 }
 
 /* Add a container for all the controls to prevent layout shifting */
@@ -11,14 +14,15 @@
   min-height: 120px;
   margin-bottom: 20px;
   position: relative;
+  padding-top: 15px;
 }
 
 .schedule-navigation {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
   gap: 0.5rem;
   flex-wrap: wrap;
 }
@@ -173,9 +177,6 @@
   border-bottom: 1px solid #ddd;
   border-right: 1px solid #ddd;
   position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
 
 /* Event item styles */
@@ -185,17 +186,31 @@
   word-break: break-word;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
   transition: all 0.3s cubic-bezier(.25,.8,.25,1);
-  width: 95%;
-  margin: 0 auto;
-  position: absolute;
-  top: 0;
-  left: 2.5%;
-  z-index: 10;
+}
+
+.event-content {
   display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  padding: 6px 8px;
-  box-sizing: border-box;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.progress-indicator {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.event-item.has-progress {
+  border-right: 3px solid #ffeb3b;
 }
 
 .event-item:hover {
@@ -288,128 +303,4 @@
 /* Loading indicator styles */
 .loading-indicator {
   display: none;
-}
-
-/* Drag and drop styles - enhanced */
-.event-item[draggable="true"] {
-  cursor: grab !important;
-  transition: transform 0.1s, box-shadow 0.1s;
-  position: relative;
-}
-
-.event-item[draggable="true"]:hover::before {
-  content: "⇅";
-  position: absolute;
-  right: 4px;
-  top: 4px;
-  font-size: 12px;
-  opacity: 0.7;
-}
-
-.event-item[draggable="true"]:active {
-  cursor: grabbing !important;
-  transform: scale(0.98);
-}
-
-.schedule-cell.drag-over {
-  background-color: rgba(76, 175, 80, 0.2) !important;
-  border: 2px dashed #4caf50 !important;
-  box-shadow: inset 0 0 5px rgba(76, 175, 80, 0.5);
-  z-index: 5;
-}
-
-/* Invalid drop target styles */
-.schedule-cell.invalid-drop-target {
-  background-color: rgba(220, 53, 69, 0.2) !important;
-  border: 2px dashed #dc3545 !important;
-  box-shadow: inset 0 0 5px rgba(220, 53, 69, 0.5);
-  z-index: 5;
-  position: relative;
-}
-
-.schedule-cell.invalid-drop-target::before {
-  content: "✕";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: #dc3545;
-  font-size: 20px;
-  opacity: 0.7;
-  pointer-events: none;
-}
-
-/* Add animation for dragging */
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
-}
-
-.event-item.dragging {
-  animation: pulse 1.5s infinite;
-  opacity: 0.8;
-  z-index: 100;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-  transform: scale(1.02);
-}
-
-/* Toast notification */
-.toast-notification {
-  position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: #4caf50;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 4px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-  z-index: 1000;
-  animation: fadeInOut 3s ease-in-out;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-/* Toast refresh button */
-.toast-refresh-btn {
-  background-color: white;
-  color: #4caf50;
-  border: none;
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  margin-left: 8px;
-}
-
-.toast-refresh-btn:hover {
-  background-color: #f1f1f1;
-}
-
-@keyframes fadeInOut {
-  0% { opacity: 0; transform: translate(-50%, -20px); }
-  10% { opacity: 1; transform: translate(-50%, 0); }
-  90% { opacity: 1; transform: translate(-50%, 0); }
-  100% { opacity: 0; transform: translate(-50%, -20px); }
-}
-
-/* Spanning event indicator - simplified */
-.schedule-cell.has-spanning-event {
-  position: relative;
-}
-
-/* When dragging, make spanning events more obvious */
-.schedule-cell.has-spanning-event.invalid-drop-target::after {
-  background: repeating-linear-gradient(
-    45deg,
-    rgba(220, 53, 69, 0.1),
-    rgba(220, 53, 69, 0.1) 10px,
-    rgba(220, 53, 69, 0.2) 10px,
-    rgba(220, 53, 69, 0.2) 20px
-  );
 } 

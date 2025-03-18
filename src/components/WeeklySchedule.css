@@ -36,4 +36,40 @@
 .schedule-navigation span {
   min-width: 200px;
   text-align: center;
+}
+
+.weekly-schedule-wrapper {
+  padding: 1rem;
+  margin-top: 2rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Add helpful instructions text */
+.instructions-text {
+  margin: 1rem 0 2rem 0;
+  padding: 1.5rem;
+  background-color: #f8f9fa;
+  border-left: 4px solid #4caf50;
+  color: #666;
+  font-size: 1rem;
+  line-height: 1.5;
+  text-align: left;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.instructions-text ul {
+  list-style-type: disc;
+  border: none;
+  background: none;
+  display: block;
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+}
+
+.instructions-text li {
+  background: none;
+  padding: 0.25rem 0;
+  margin-bottom: 0.5rem;
 } 

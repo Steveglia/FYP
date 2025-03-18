@@ -84,10 +84,35 @@ const schema = a
       })
       .authorization(allow => [allow.publicApiKey()]),
 
+    UserProgress: a
+      .model({
+        userId: a.string().required(),
+        courseId: a.string().required(),
+        lectureId: a.string().required(),
+        completedLectures: a.string().array(),
+        quizScores: a.integer(), 
+        lastAccessed: a.string().required(),
+      })
+      .authorization(allow => [allow.publicApiKey()]),
+
+    ScheduledReviews: a
+      .model({
+        userId: a.string().required(),
+        courseId: a.string().required(),
+        lectureId: a.string().required(),
+        reviewDate: a.string().required(),
+        halfLife: a.float().required(),
+        lastScore: a.integer().required(),
+        lastReviewDate: a.string().required(),
+        studyCount: a.integer()
+      })
+      .authorization(allow => [allow.publicApiKey()]),
+
   })
   .authorization(allow => [
     allow.resource(store_events),
-    allow.resource(store_lectures)])
+    allow.resource(store_lectures),
+  ])
 
   ;
 

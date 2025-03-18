@@ -30,12 +30,12 @@ const StudySessionCard: React.FC<StudySessionCardProps> = ({
   };
   
   // Extract course name from title (format is "Study: Course Name")
-  const getCourse = () => {
-    if (!session.title) return 'Study Session';
-    return session.title.startsWith('Study: ') 
-      ? session.title.substring(7) 
-      : session.title;
-  };
+  // const getCourse = () => {
+  //   if (!session.title) return 'Study Session';
+  //   return session.title.startsWith('Study: ') 
+  //     ? session.title.substring(7) 
+  //     : session.title;
+  // };
   
   // Handle accepting the study session
   const handleAccept = async () => {
@@ -82,7 +82,7 @@ const StudySessionCard: React.FC<StudySessionCardProps> = ({
     <Card sx={{ mb: 2, border: isAccepted ? '2px solid #4caf50' : isSaved ? '2px solid #2196f3' : undefined }}>
       <CardContent>
         <Typography variant="h6" component="div">
-          {getCourse()}
+          Study Session
         </Typography>
         
         <Typography color="text.secondary">
@@ -127,9 +127,9 @@ const StudySessionCard: React.FC<StudySessionCardProps> = ({
         )}
         
         {isAccepted && (
-          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-            <Typography variant="body2" color="success.main" sx={{ display: 'flex', alignItems: 'center' }}>
-              ✓ Accepted <span style={{ marginLeft: '4px', fontSize: '14px' }}>&#8645; (Drag to reschedule)</span>
+          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+            <Typography variant="body2" color="success.main">
+              ✓ Accepted
             </Typography>
           </Box>
         )}

@@ -43,18 +43,33 @@ export const getEventColor = (event: ScheduleEvent): string => {
   return eventTypeColors[event.type as keyof typeof eventTypeColors] || eventTypeColors.default;
 };
 
-// Helper function to get Monday of the week of September 23, 2024
-export const getMondayOfCurrentWeek = (): Date => {
-  // Create a date for September 23, 2024 (which is a Monday)
-  // This is a fixed date for the academic year 2024-2025
-  const targetDate = new Date(2024, 8, 23); // Month is 0-indexed, so 8 = September
-  
-  // Ensure it's set to the beginning of the day
-  targetDate.setHours(0, 0, 0, 0);
-  
-  console.log('Returning fixed date for academic year:', targetDate.toLocaleDateString('en-GB'));
-  
-  return targetDate;
+// Helper function to get Monday of the week of September 23, 2024 or a specified date
+export const getMondayOfCurrentWeek = (customDate?: Date): Date => {
+  if (customDate) {
+    // If a custom date is provided, calculate the Monday of its week
+    const day = customDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const diff = customDate.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
+    
+    const monday = new Date(customDate);
+    monday.setDate(diff);
+    monday.setHours(0, 0, 0, 0);
+    
+    console.log('Calculated Monday for custom date:', monday.toLocaleDateString('en-GB'));
+    
+    return monday;
+  } else {
+    // Default behavior - return fixed academic year start date
+    // Create a date for September 23, 2024 (which is a Monday)
+    // This is a fixed date for the academic year 2024-2025
+    const targetDate = new Date(2024, 8, 23); // Month is 0-indexed, so 8 = September
+    
+    // Ensure it's set to the beginning of the day
+    targetDate.setHours(0, 0, 0, 0);
+    
+    console.log('Returning fixed date for academic year:', targetDate.toLocaleDateString('en-GB'));
+    
+    return targetDate;
+  }
 };
 
 // Helper function to create test study sessions
@@ -83,14 +98,14 @@ export const createTestStudySessions = (currentWeekStart: Date): Event[] => {
     
     testStudySessions.push({
       id: uniqueId,
-      title: `Study Session: ${dayName}`,
+      title: `Study Session`,
       description: `Test generated study session for ${dayName}`,
       type: 'STUDY',
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
       createdAt: now,
       updatedAt: now
-    } as Event); // Type assertion to match Event interface
+    });
   }
   
   console.log('Created test study events as fallback:', testStudySessions.length);

@@ -1,0 +1,446 @@
+.scheduled-reviews-panel {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 16px;
+  margin-bottom: 20px;
+  max-width: 800px;
+  margin: 0 auto 20px auto;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 12px;
+}
+
+.panel-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.refresh-button, .manage-button {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #4caf50;
+  padding: 4px 8px;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.refresh-button:hover, .manage-button:hover {
+  background-color: rgba(76, 175, 80, 0.1);
+}
+
+.manage-button {
+  color: #2196f3;
+}
+
+.manage-button:hover {
+  background-color: rgba(33, 150, 243, 0.1);
+}
+
+.loading-indicator {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+  font-style: italic;
+}
+
+.error-message {
+  padding: 12px;
+  background-color: #ffebee;
+  color: #c62828;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.success-message {
+  padding: 12px;
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  text-align: center;
+  animation: fadeOut 3s forwards;
+  animation-delay: 3s;
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.no-reviews-message {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+
+.no-reviews-message p {
+  margin: 6px 0;
+}
+
+/* Management options */
+.management-options {
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid #e0e0e0;
+}
+
+.management-options h3 {
+  margin-top: 0;
+  color: #333;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.management-description {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.management-actions {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.delete-all-button {
+  background-color: #f44336;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.delete-all-button:hover:not(:disabled) {
+  background-color: #d32f2f;
+}
+
+.delete-all-button:disabled {
+  background-color: #e0e0e0;
+  color: #9e9e9e;
+  cursor: not-allowed;
+}
+
+.course-management {
+  margin-top: 16px;
+  border-top: 1px solid #e0e0e0;
+  padding-top: 16px;
+}
+
+.course-management h4 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 15px;
+  color: #333;
+}
+
+.course-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.course-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+
+.course-name {
+  font-weight: 500;
+  color: #333;
+}
+
+.delete-course-button {
+  background-color: #ff5722;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.delete-course-button:hover {
+  background-color: #e64a19;
+}
+
+/* Delete confirmation dialog */
+.delete-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.delete-dialog {
+  background-color: white;
+  border-radius: 8px;
+  padding: 24px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.delete-dialog h3 {
+  margin-top: 0;
+  color: #d32f2f;
+  margin-bottom: 16px;
+}
+
+.warning-text {
+  font-weight: bold;
+  color: #d32f2f;
+  margin-top: 16px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.cancel-button {
+  background-color: #f5f5f5;
+  color: #333;
+  border: 1px solid #ccc;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.cancel-button:hover:not(:disabled) {
+  background-color: #e0e0e0;
+}
+
+.confirm-delete-button {
+  background-color: #f44336;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.confirm-delete-button:hover:not(:disabled) {
+  background-color: #d32f2f;
+}
+
+.confirm-delete-button:disabled,
+.cancel-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.review-item {
+  display: flex;
+  padding: 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background-color: #f8f9fa;
+  position: relative;
+  overflow: hidden;
+}
+
+.review-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-color: #4caf50;
+}
+
+.review-item.expanded {
+  background-color: #f0f7ff;
+  border-color: #2196f3;
+  padding-bottom: 20px;
+}
+
+.review-date {
+  min-width: 150px;
+  border-right: 1px solid #e0e0e0;
+  padding-right: 16px;
+  margin-right: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.date-display {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.time-display {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.days-until {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4caf50;
+  background-color: rgba(76, 175, 80, 0.1);
+  padding: 4px 8px;
+  border-radius: 12px;
+  display: inline-block;
+  text-align: center;
+}
+
+.review-details {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.review-title {
+  font-weight: 500;
+  color: #333;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.review-description {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 10px;
+  max-height: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.expanded .review-description {
+  max-height: 100px;
+  -webkit-line-clamp: 4;
+}
+
+.review-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: #666;
+  flex-wrap: wrap;
+}
+
+.review-score {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: #4caf50;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.review-count {
+  background-color: rgba(33, 150, 243, 0.1);
+  color: #2196f3;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.review-extra-details {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px dashed #e0e0e0;
+  font-size: 13px;
+  color: #666;
+}
+
+.review-calculated-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.review-calculated-info p {
+  margin: 0;
+  padding: 4px 8px;
+  background-color: rgba(0, 0, 0, 0.04);
+  border-radius: 4px;
+}
+
+.delete-review-button {
+  background-color: #ff5722;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+  align-self: flex-start;
+}
+
+.delete-review-button:hover {
+  background-color: #e64a19;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .review-item {
+    flex-direction: column;
+  }
+  
+  .review-date {
+    border-right: none;
+    border-bottom: 1px solid #e0e0e0;
+    padding-right: 0;
+    padding-bottom: 12px;
+    margin-right: 0;
+    margin-bottom: 12px;
+  }
+  
+  .review-calculated-info {
+    flex-direction: column;
+    gap: 6px;
+  }
+} 

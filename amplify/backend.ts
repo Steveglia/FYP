@@ -18,7 +18,7 @@ const backend = defineBackend({
   store_events,
   store_lectures,
   generatePreferenceVector,
-  generateStudySessions
+  generateStudySessions,
 });
 
 // Event notification for store_events function

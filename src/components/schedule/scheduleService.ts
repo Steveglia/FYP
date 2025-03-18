@@ -24,11 +24,8 @@ export const saveAcceptedStudySession = async (studySession: Event, userId: stri
     const endDate = new Date(studySession.endDate);
     const endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
     
-    // Extract course from title (format is "Study: Course Name")
-    const title = studySession.title || '';
-    const course = title.startsWith('Study: ') 
-      ? title.substring(7) 
-      : title;
+    // Use "Study Session" as the course
+    const course = "Study Session";
     
     // Create the accepted study session record
     const result = await client.models.AcceptedStudySession.create({
@@ -40,10 +37,10 @@ export const saveAcceptedStudySession = async (studySession: Event, userId: stri
       endDate: studySession.endDate,
       userId,
       weekStartDate: weekStartDate.toISOString(),
-      title: studySession.title,
+      title: "Study Session",
       description: studySession.description || '',
       type: 'STUDY'
-    } as any);
+    });
     
     console.log('Study session accepted and saved:', result);
     return true;
@@ -69,7 +66,7 @@ export const fetchAcceptedStudySessions = async (weekStartDate: Date, userId: st
           { weekStartDate: { eq: weekStartStr } },
           { userId: { eq: userId } }
         ]
-      } as any // Type assertion to bypass type checking
+      }
     });
     
     if (result.data && result.data.length > 0) {
@@ -83,7 +80,7 @@ export const fetchAcceptedStudySessions = async (weekStartDate: Date, userId: st
         endDate: session.endDate,
         createdAt: session.createdAt,
         updatedAt: session.updatedAt
-      })) as Event[]; // Type assertion to match Event interface
+      }));
     }
     
     return [];
@@ -94,42 +91,29 @@ export const fetchAcceptedStudySessions = async (weekStartDate: Date, userId: st
 };
 
 // Fetch events for the current week
-export const fetchEvents = async (currentWeekStart: Date, _userId: string): Promise<Event[]> => {
+export const fetchEvents = async (currentWeekStart: Date): Promise<Event[]> => {
   try {
     // Calculate week end date
     const weekEndDate = new Date(currentWeekStart);
     weekEndDate.setDate(currentWeekStart.getDate() + 7);
     
-    // Format dates for query
+    // Format dates for query (if needed)
     const startDateStr = currentWeekStart.toISOString();
     const endDateStr = weekEndDate.toISOString();
     
-    // Query events for the current week
-    const result = await client.models.CalendarEvent.list({
-      filter: {
-        and: [
-          { startDate: { ge: startDateStr } },
-          { startDate: { lt: endDateStr } }
-          // userId is intentionally not used in the filter yet
-          // We'll add it back once we confirm events are showing properly
-          // { userId: { eq: _userId } }
-        ]
-      } as any // Type assertion to bypass type checking
-    });
+    console.log(`Fetching events from ${startDateStr} to ${endDateStr}`);
     
-    if (result.data) {
-      // Don't filter by userId for now to ensure events are displayed
-      // We can add this back once we confirm events are showing
-      const events = result.data;
-      
-      console.log('Fetched events for current week:', events);
-      return events as Event[]; // Type assertion to match Event interface
-    }
+    // Fetch events from the backend
+    const response = await client.models.CalendarEvent.list();
+    
+    // Filter events for the current week if needed
+    // You could add filtering logic here based on startDateStr and endDateStr
+    
+    return response.data as Event[];
   } catch (error) {
     console.error('Error fetching events:', error);
+    return [];
   }
-  
-  return [];
 };
 
 // Fetch lectures for the current week
@@ -151,7 +135,7 @@ export const fetchLectures = async (currentWeekStart: Date): Promise<Event[]> =>
           { start_date: { ge: startDateStr } },
           { start_date: { lt: endDateStr } }
         ]
-      } as any // Type assertion to bypass type checking
+      }
     });
     
     if (result.data) {
@@ -186,7 +170,7 @@ export const fetchLectures = async (currentWeekStart: Date): Promise<Event[]> =>
           location: lecture.location || 'Unknown',
           createdAt: now,
           updatedAt: now
-        } as Event; // Type assertion to match Event interface
+        };
         
         // Add custom properties
         (event as any).isLecture = !isLab;
@@ -250,7 +234,7 @@ export const generateStudySessions = async (
           { startDate: { ge: startDateStr } },
           { startDate: { lt: endDateStr } }
         ]
-      } as any // Type assertion to bypass type checking
+      }
     });
     
     // Fetch lectures directly from the database for the current week
@@ -260,7 +244,7 @@ export const generateStudySessions = async (
           { start_date: { ge: startDateStr } },
           { start_date: { lt: endDateStr } }
         ]
-      } as any // Type assertion to bypass type checking
+      }
     });
     
     // Process lectures into Event format
@@ -295,7 +279,7 @@ export const generateStudySessions = async (
           location: lecture.location || 'Unknown',
           createdAt: now,
           updatedAt: now
-        } as Event; // Type assertion to match Event interface
+        };
         
         // Add custom properties
         (event as any).isLecture = !isLab;
@@ -449,7 +433,7 @@ export const generateStudySessions = async (
                 
                 return {
                   id: `study-${Date.now()}-${index}`,
-                  title: `Study: ${session.course || 'General'}`,
+                  title: `Study Session`,
                   description: `Study session for ${session.course || 'general topics'}`,
                   type: 'STUDY',
                   startDate: startDateIso,
@@ -494,7 +478,7 @@ export const deleteAcceptedStudySessions = async (weekStartDate: Date, userId: s
           { weekStartDate: { eq: weekStartStr } },
           { userId: { eq: userId } }
         ]
-      } as any // Type assertion to bypass type checking
+      }
     });
     
     if (result.data && result.data.length > 0) {
@@ -520,89 +504,30 @@ export const deleteAcceptedStudySessions = async (weekStartDate: Date, userId: s
   }
 };
 
-// Update event times when dragged and dropped
-export const updateEventTimes = async (
-  event: Event,
-  newStartDate: string,
-  newEndDate: string
-): Promise<boolean> => {
+export const scheduleReview = async (userId: string, courseId: string, lectureId: string, initialScore: number) => {
   try {
-    if (!event || !event.id || !newStartDate || !newEndDate) {
-      console.error('Invalid event or date parameters');
-      return false;
-    }
+    // Implement the scheduling mechanism
+    console.log(`Scheduling review for user: ${userId}, course: ${courseId}, lecture: ${lectureId}, with score: ${initialScore}`);
     
-    console.log('Updating event times in database:', {
-      id: event.id,
-      newStartDate,
-      newEndDate
+    // Example implementation (commented out)
+    /*
+    const nextReviewDate = calculateNextReviewDate(initialScore);
+    
+    // Save the scheduled review to the database
+    await client.models.ScheduledReviews.create({
+      userId: userId,
+      courseId: courseId,
+      lectureId: lectureId,
+      reviewDate: nextReviewDate.toISOString(),
+      halfLife: calculateHalfLife(initialScore),
+      lastScore: initialScore,
+      lastReviewDate: new Date().toISOString(),
+      studyCount: 1
     });
+    */
     
-    // Check if this is a study session (they're stored in AcceptedStudySession model)
-    if (event.type === 'STUDY') {
-      // Parse the ISO date strings to Date objects
-      const sessionDate = new Date(newStartDate);
-      const endDate = new Date(newEndDate);
-      
-      // Log the parsed dates for debugging
-      console.log('Parsed dates in updateEventTimes:', {
-        sessionDate: sessionDate.toLocaleString(),
-        sessionDateHour: sessionDate.getHours(),
-        endDate: endDate.toLocaleString(),
-        endDateHour: endDate.getHours()
-      });
-      
-      // Extract day name from the date
-      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const day = dayNames[sessionDate.getDay()];
-      
-      // Format times using local hours
-      const startHours = sessionDate.getHours();
-      const startMinutes = sessionDate.getMinutes();
-      const startTime = `${String(startHours).padStart(2, '0')}:${String(startMinutes).padStart(2, '0')}`;
-      
-      const endHours = endDate.getHours();
-      const endMinutes = endDate.getMinutes();
-      const endTime = `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
-      
-      console.log('Updating study session with:', {
-        id: event.id,
-        day,
-        startTime,
-        endTime,
-        startDate: newStartDate,
-        endDate: newEndDate,
-        startHours,
-        startMinutes,
-        endHours,
-        endMinutes
-      });
-      
-      // Update the study session
-      const result = await client.models.AcceptedStudySession.update({
-        id: event.id,
-        day,
-        startTime,
-        endTime,
-        startDate: newStartDate,
-        endDate: newEndDate
-      } as any); // Type assertion to bypass type checking
-      
-      console.log('Study session updated:', result);
-      return true;
-    } else {
-      // Update regular calendar event
-      const result = await client.models.CalendarEvent.update({
-        id: event.id,
-        startDate: newStartDate,
-        endDate: newEndDate
-      } as any); // Type assertion to bypass type checking
-      
-      console.log('Calendar event updated:', result);
-      return true;
-    }
+    // Add your full scheduling logic here
   } catch (error) {
-    console.error('Error updating event times:', error);
-    return false;
+    console.error('Error scheduling review:', error);
   }
 }; 
