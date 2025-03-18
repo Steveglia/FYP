@@ -114,23 +114,14 @@ export const calculateHalfLife = (
  * 
  * @param halfLife - Half-life in days
  * @param quizDate - Date when the quiz was taken (defaults to current date if not provided)
- * @param getCurrentTime - Function to get the current time (optional)
  * @returns Date object for the next review
  */
-export const scheduleNextReview = (halfLife: number, quizDate?: Date | string, getCurrentTime?: () => Date): Date => {
-  // Convert quizDate to Date object if it's a string
-  let quizDateObj: Date;
-  if (quizDate) {
-    quizDateObj = typeof quizDate === 'string' ? new Date(quizDate) : quizDate;
-  } else {
-    // Use provided current time function or default to new Date()
-    quizDateObj = getCurrentTime ? getCurrentTime() : new Date();
-  }
+export const scheduleNextReview = (halfLife: number, quizDate?: Date | string): Date => {
+  // Use provided quiz date or fall back to current date
+  const baseDate = quizDate ? new Date(quizDate) : new Date();
   
-  // Calculate next review date by adding half-life in days to the quiz date
-  const nextReviewDate = new Date(quizDateObj);
-  nextReviewDate.setDate(nextReviewDate.getDate() + halfLife);
-  
+  // Add the half-life in days to the base date
+  const nextReviewDate = new Date(baseDate.getTime() + (halfLife * 24 * 60 * 60 * 1000));
   return nextReviewDate;
 };
 
@@ -243,7 +234,6 @@ export const estimateTaskComplexity = async (
  * @param score - Quiz score (0-100)
  * @param studyCount - Number of times this lecture has been studied
  * @param quizDate - Date when the quiz was taken (defaults to current date if not provided)
- * @param getCurrentTime - Function to get the current time (optional)
  * @returns Whether the review was successfully scheduled
  */
 export const saveScheduledReview = async (
@@ -252,104 +242,80 @@ export const saveScheduledReview = async (
   lectureId: string,
   score: number,
   studyCount: number = 1,
-  quizDate?: Date | string,
-  getCurrentTime?: () => Date
+  quizDate?: Date | string
 ): Promise<boolean> => {
   try {
-    console.log(`Saving scheduled review for user ${userId}, lecture ${lectureId} with score ${score}`);
+    // If quizDate is not provided, use current date
+    const quizDateTime = quizDate ? new Date(quizDate) : new Date();
+    const lastReviewDate = quizDateTime.toISOString();
     
-    // Get task complexity and estimated study duration
-    const { data: lectureData } = await client.models.Lectures.get({ id: lectureId });
+    // Get lecture metadata for better calculations
+    const metadata = await getLectureMetadata(lectureId);
     
-    // Use defaults if lecture not found
-    const taskComplexity = lectureData?.difficulty ? parseInt(lectureData.difficulty, 10) : 5;
-    const studyDuration = lectureData?.duration ? parseInt(lectureData.duration, 10) : 60;
-    
-    console.log(`Lecture metadata - complexity: ${taskComplexity}, duration: ${studyDuration} minutes`);
-    
-    // Get time since last review (in hours)
-    const timeSinceLastReview = await getTimeSinceLastReview(userId, lectureId);
-    
-    // Get existing half-life if available
-    let previousHalfLife: number | undefined;
-    try {
-      const existingReviews = await client.models.ScheduledReviews.list({
-        filter: {
-          and: [
-            { userId: { eq: userId } },
-            { lectureId: { eq: lectureId } }
-          ]
-        }
-      });
-      
-      if (existingReviews.data && existingReviews.data.length > 0) {
-        previousHalfLife = existingReviews.data[0].halfLife;
-        console.log(`Previous half-life: ${previousHalfLife} hours`);
-      }
-    } catch (error) {
-      console.error("Error fetching previous half-life:", error);
-    }
-    
-    // Calculate new half-life
-    const halfLife = calculateHalfLife(
-      score,
-      studyDuration,
-      taskComplexity,
-      timeSinceLastReview,
-      previousHalfLife,
-      studyCount
+    // Calculate estimated task complexity based on lecture data
+    const taskComplexity = await estimateTaskComplexity(
+      lectureId, 
+      metadata.title || undefined, 
+      metadata.description || undefined
     );
     
-    console.log(`Calculated half-life: ${halfLife} hours`);
+    // Estimate study duration based on lecture data
+    const studyDuration = await estimateStudyDuration(
+      lectureId,
+      metadata.title || undefined,
+      metadata.description || undefined
+    );
     
-    // Schedule next review
-    const nextReviewDate = scheduleNextReview(halfLife, quizDate, getCurrentTime);
+    // Get time since last review (in days)
+    const timeSinceLastReview = await getTimeSinceLastReview(userId, lectureId);
     
-    console.log(`Next review scheduled for: ${nextReviewDate.toISOString()}`);
+    // Calculate half-life based on performance and other factors
+    const halfLife = calculateHalfLife(score, studyDuration, taskComplexity, timeSinceLastReview);
     
-    // Check for existing review
+    // Schedule next review date using the quiz date
+    const reviewDate = scheduleNextReview(halfLife, quizDateTime);
+    
+    // First try to update an existing record for this specific lecture
     const existingReviews = await client.models.ScheduledReviews.list({
       filter: {
-        and: [
-          { userId: { eq: userId } },
-          { lectureId: { eq: lectureId } }
-        ]
+        userId: { eq: userId },
+        lectureId: { eq: lectureId }
       }
     });
     
-    if (existingReviews.data && existingReviews.data.length > 0) {
-      // Update existing review
+    if (existingReviews.data.length > 0) {
+      // Update existing record for this lecture
       const existingReview = existingReviews.data[0];
-      
-      const updateResult = await client.models.ScheduledReviews.update({
+      await client.models.ScheduledReviews.update({
         id: existingReview.id,
-        halfLife: halfLife,
+        userId,
+        courseId,
+        lectureId,
+        reviewDate: reviewDate.toISOString(),
+        halfLife,
         lastScore: score,
-        reviewDate: nextReviewDate.toISOString(),
-        lastReviewDate: nextReviewDate.toISOString(),
-        studyCount: studyCount
+        lastReviewDate,
+        studyCount
       });
-      
-      console.log("Updated scheduled review:", updateResult);
-      return true;
+      console.log(`Updated scheduled review for lecture: ${lectureId} with next review on ${reviewDate.toLocaleString()}`);
     } else {
-      // Create new review
-      const createResult = await client.models.ScheduledReviews.create({
-        userId: userId,
-        courseId: courseId,
-        lectureId: lectureId,
-        halfLife: halfLife,
+      // Create new record for this lecture
+      await client.models.ScheduledReviews.create({
+        userId,
+        courseId,
+        lectureId,
+        reviewDate: reviewDate.toISOString(),
+        halfLife,
         lastScore: score,
-        reviewDate: nextReviewDate.toISOString(),
-        lastReviewDate: nextReviewDate.toISOString(),
-        studyCount: studyCount
+        lastReviewDate,
+        studyCount
       });
-      
-      console.log("Created scheduled review:", createResult);
-      return true;
+      console.log(`Created new scheduled review for lecture: ${lectureId} with next review on ${reviewDate.toLocaleString()}`);
     }
+    
+    return true;
   } catch (error) {
-    console.error("Error saving scheduled review:", error);
+    console.error('Error saving scheduled review:', error);
     return false;
   }
 };
@@ -414,121 +380,5 @@ export const getTimeSinceLastReview = async (userId: string, lectureId: string):
   } catch (error) {
     console.error('Error getting time since last review:', error);
     return 0;
-  }
-};
-
-/**
- * Delete scheduled reviews with optional filtering by course or lecture
- * 
- * @param userId - ID of the user
- * @param courseId - Optional course ID to filter by
- * @param lectureId - Optional lecture ID to filter by 
- * @returns Number of deleted reviews
- */
-export const deleteScheduledReviews = async (
-  userId: string,
-  courseId?: string,
-  lectureId?: string
-): Promise<number> => {
-  try {
-    console.log("Deleting scheduled reviews with filters:", { userId, courseId, lectureId });
-    
-    // Build filter based on provided parameters
-    const filter: any = { userId: { eq: userId } };
-    
-    if (courseId) {
-      filter.courseId = { eq: courseId };
-    }
-    
-    if (lectureId) {
-      filter.lectureId = { eq: lectureId };
-    }
-    
-    // Get all matching reviews
-    const reviews = await client.models.ScheduledReviews.list({ filter });
-    
-    if (!reviews.data || reviews.data.length === 0) {
-      console.log("No matching scheduled reviews found to delete");
-      return 0;
-    }
-    
-    console.log(`Found ${reviews.data.length} reviews to delete`);
-    
-    // Delete each review
-    const deletePromises = reviews.data.map(review => 
-      client.models.ScheduledReviews.delete({ id: review.id })
-    );
-    
-    // Wait for all deletions to complete
-    const results = await Promise.all(deletePromises);
-    
-    const successCount = results.filter(result => !result.errors).length;
-    console.log(`Successfully deleted ${successCount} scheduled reviews`);
-    
-    return successCount;
-  } catch (error) {
-    console.error("Error deleting scheduled reviews:", error);
-    throw error;
-  }
-};
-
-/**
- * Synchronize deletion between UserProgress and ScheduledReviews
- * This function deletes UserProgress records and their associated scheduled reviews
- * 
- * @param userId - ID of the user
- * @param courseId - Optional course ID to filter by
- * @param lectureId - Optional lecture ID to filter by
- * @returns Object with counts of deleted records
- */
-export const syncDeleteUserData = async (
-  userId: string,
-  courseId?: string,
-  lectureId?: string
-): Promise<{progressDeleted: number, reviewsDeleted: number}> => {
-  try {
-    console.log("Synchronizing deletion of user data:", { userId, courseId, lectureId });
-    
-    // Build filter based on provided parameters
-    const filter: any = { userId: { eq: userId } };
-    
-    if (courseId) {
-      filter.courseId = { eq: courseId };
-    }
-    
-    if (lectureId) {
-      filter.lectureId = { eq: lectureId };
-    }
-    
-    // 1. First get all matching UserProgress records
-    const progressRecords = await client.models.UserProgress.list({ filter });
-    
-    if (!progressRecords.data || progressRecords.data.length === 0) {
-      console.log("No matching progress records found to delete");
-      
-      // Even if no progress records exist, we should still delete scheduled reviews
-      const reviewsDeleted = await deleteScheduledReviews(userId, courseId, lectureId);
-      
-      return { progressDeleted: 0, reviewsDeleted };
-    }
-    
-    // 2. Delete each progress record
-    const deleteProgressPromises = progressRecords.data.map(record => 
-      client.models.UserProgress.delete({ id: record.id })
-    );
-    
-    // 3. Delete associated scheduled reviews
-    const reviewsDeleted = await deleteScheduledReviews(userId, courseId, lectureId);
-    
-    // 4. Wait for all progress deletions to complete
-    const progressResults = await Promise.all(deleteProgressPromises);
-    const progressDeleted = progressResults.filter(result => !result.errors).length;
-    
-    console.log(`Successfully synchronized deletion: ${progressDeleted} progress records and ${reviewsDeleted} scheduled reviews`);
-    
-    return { progressDeleted, reviewsDeleted };
-  } catch (error) {
-    console.error("Error synchronizing deletion:", error);
-    throw error;
   }
 }; 

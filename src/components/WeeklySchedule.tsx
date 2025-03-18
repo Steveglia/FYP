@@ -18,8 +18,6 @@ const WeeklyScheduleWrapper: React.FC<WeeklyScheduleWrapperProps> = ({ events, u
   // Use provided userId or fall back to authenticated user's ID
   const effectiveUserId = userId || user?.username || '';
   
-  console.log('WeeklyScheduleWrapper - passing events:', events?.length || 0);
-  
   return (
     <div className="weekly-schedule-wrapper">
       {(!events || events.length === 0) && (

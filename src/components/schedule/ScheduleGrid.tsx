@@ -50,7 +50,6 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
           });
           
           setProgressMap(progressTracker);
-          console.log('Loaded progress data for courses and lectures:', Object.keys(progressTracker).length);
         }
       } catch (error) {
         console.error('Error fetching progress data:', error);
@@ -74,8 +73,8 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
       `Type: ${event.isLecture ? 'LECTURE' : event.type}`
     ];
     
-    if (event.isLecture) {
-      parts.push('Click to take a quiz');
+    if (event.isAcceptedStudySession) {
+      parts.push('Click to track progress');
     }
     
     return parts.filter(Boolean).join('\n');
@@ -83,7 +82,7 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
 
   // Function to handle event click
   const handleEventClick = (event: ScheduleEvent) => {
-    if (event.isLecture && onEventClick) {
+    if (event.isAcceptedStudySession && onEventClick) {
       onEventClick(event);
     }
   };
@@ -95,7 +94,12 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     // Check if the lecture ID directly has a score
     if (progressMap[event.id] === true) return true;
     
-    // If not found directly, this lecture doesn't have a score
+    // Check if the course has a score (extracted from lecture title)
+    if (event.title) {
+      const courseId = event.title.split(':')[0]?.trim();
+      if (courseId && progressMap[courseId] === true) return true;
+    }
+    
     return false;
   };
 
@@ -131,7 +135,7 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                         padding: '4px',
                         borderRadius: '4px',
                         overflow: 'hidden',
-                        cursor: event.isLecture ? 'pointer' : 'default'
+                        cursor: event.isAcceptedStudySession ? 'pointer' : 'default'
                       }}
                       title={generateTooltip(event)}
                       onClick={() => handleEventClick(event)}

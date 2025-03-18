@@ -4,14 +4,14 @@ import { generateClient } from 'aws-amplify/data';
 import type { Schema } from "../../../amplify/data/resource";
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import * as hlrService from './hlrService';
-import './StudySessionQuizModal.css';
+import './LectureQuizModal.css';
 
 const client = generateClient<Schema>();
 
-interface StudySessionQuizModalProps {
+interface LectureQuizModalProps {
   isOpen: boolean;
   onClose: () => void;
-  studySession: ScheduleEvent | null;
+  lecture: ScheduleEvent | null;
   lectures: Event[];
   onProgressSaved?: () => void;
 }
@@ -21,24 +21,22 @@ interface ProgressData {
   quizScore: number;
 }
 
-const StudySessionQuizModal: React.FC<StudySessionQuizModalProps> = ({
+const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
   isOpen,
   onClose,
-  studySession,
+  lecture,
   lectures,
   onProgressSaved
 }) => {
   const { user } = useAuthenticator();
-  const [selectedLecture, setSelectedLecture] = useState<string>('');
-  const [selectedLectureData, setSelectedLectureData] = useState<Event | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [score, setScore] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [progress, setProgress] = useState<Record<string, ProgressData>>({});
   
   // Load user progress data when modal opens
   useEffect(() => {
-    if (isOpen && studySession) {
+    if (isOpen && lecture) {
       // Add a test to validate that we can access the database
       const testDatabaseAccess = async () => {
         try {
@@ -62,15 +60,13 @@ const StudySessionQuizModal: React.FC<StudySessionQuizModalProps> = ({
       
       testDatabaseAccess();
       
-      setSelectedLecture('');
-      setSelectedLectureData(null);
       setScore(0);
       setErrorMessage(null);
       
       // Load existing progress data when modal opens
       loadUserProgress();
     }
-  }, [isOpen, studySession, user]);
+  }, [isOpen, lecture, user]);
   
   // Load user progress data for all courses
   const loadUserProgress = async () => {
@@ -95,41 +91,26 @@ const StudySessionQuizModal: React.FC<StudySessionQuizModalProps> = ({
         
         setProgress(progressByLecture);
         console.log('Loaded user progress:', progressByLecture);
+        
+        // Pre-fill with existing score if available
+        if (lecture) {
+          const courseId = lecture.title?.split(':')[0]?.trim() || '';
+          if (progressByLecture[courseId] && progressByLecture[courseId].quizScore > 0) {
+            setScore(progressByLecture[courseId].quizScore);
+            console.log('Pre-filled score:', progressByLecture[courseId].quizScore);
+          }
+        }
       }
     } catch (error) {
       console.error('Error loading user progress:', error);
     }
   };
   
-  // Update the selected lecture data when a lecture is selected
-  useEffect(() => {
-    if (selectedLecture) {
-      const lecture = lectures.find(l => l.id === selectedLecture) || null;
-      setSelectedLectureData(lecture);
-      
-      // Pre-fill with existing score if available
-      if (lecture) {
-        const courseId = lecture.title?.split(':')[0]?.trim() || '';
-        if (progress[courseId]) {
-          setScore(progress[courseId].quizScore);
-        } else {
-          setScore(0);
-        }
-      }
-    } else {
-      setSelectedLectureData(null);
-    }
-  }, [selectedLecture, lectures, progress]);
-  
-  // Filter for lectures from the current week
-  const weekLectures = lectures.filter(lecture => lecture.isLecture);
-  
   const handleSaveProgress = async () => {
-    if (!selectedLecture || !selectedLectureData || !user?.username) {
+    if (!lecture || !user?.username) {
       setErrorMessage("Missing required information to save progress");
       console.error("Save failed - missing data:", { 
-        selectedLecture, 
-        selectedLectureData, 
+        lecture, 
         userId: user?.username 
       });
       return;
@@ -139,8 +120,8 @@ const StudySessionQuizModal: React.FC<StudySessionQuizModalProps> = ({
     setErrorMessage(null);
     
     try {
-      const courseId = selectedLectureData.title?.split(':')[0]?.trim() || 'UNKNOWN';
-      const lectureId = selectedLectureData.id || '';
+      const courseId = lecture.title?.split(':')[0]?.trim() || 'UNKNOWN';
+      const lectureId = lecture.id || '';
       const now = new Date().toISOString();
       
       console.log("Attempting to save progress with:", {
@@ -263,21 +244,23 @@ const StudySessionQuizModal: React.FC<StudySessionQuizModalProps> = ({
             console.error("Error fetching existing reviews:", reviewError);
           }
           
-          // Use the current time as the quiz date
-          const quizDate = new Date();
+          // Use the lecture date as the quiz completion time 
+          const quizCompletionTime = lecture?.startDate ? new Date(lecture.startDate) : new Date(now);
           
-          // Save the review using the enhanced HLR service with quiz date
+          console.log(`Quiz completion time: ${quizCompletionTime.toLocaleString()} (based on lecture date)`);
+          
+          // Save the review using the enhanced HLR service with the actual quiz completion time
           const reviewScheduled = await hlrService.saveScheduledReview(
             user.username,
             courseId,
             lectureId,
             score,
             studyCount,
-            quizDate
+            quizCompletionTime
           );
           
           if (reviewScheduled) {
-            console.log(`Successfully scheduled next review session for lecture ${lectureId} based on quiz taken at ${quizDate.toLocaleString()}`);
+            console.log(`Successfully scheduled next review session for lecture ${lectureId} based on quiz taken at ${quizCompletionTime.toLocaleString()}`);
           } else {
             console.warn('Failed to schedule next review session');
           }
@@ -305,7 +288,7 @@ const StudySessionQuizModal: React.FC<StudySessionQuizModalProps> = ({
         }
       });
       
-      let confirmationMessage = `Progress saved! Score: ${score}% for ${selectedLectureData.title}`;
+      let confirmationMessage = `Progress saved! Score: ${score}% for ${lecture.title}`;
       
       if (scheduledReviews.data && scheduledReviews.data.length > 0) {
         const nextReview = new Date(scheduledReviews.data[0].reviewDate);
@@ -346,111 +329,63 @@ const StudySessionQuizModal: React.FC<StudySessionQuizModalProps> = ({
     }
   };
   
-  // Helper function to get lecture previous score if available
-  const getLecturePreviousScore = (lecture: Event): number | null => {
-    if (!lecture || !lecture.title) return null;
-    
-    const courseId = lecture.title.split(':')[0]?.trim() || '';
-    if (progress[courseId] && progress[courseId].quizScore > 0) {
-      return progress[courseId].quizScore;
-    }
-    
-    return null;
-  };
-  
   // Handle score change
   const handleScoreChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newScore = parseInt(e.target.value, 10);
     setScore(isNaN(newScore) ? 0 : Math.min(100, Math.max(0, newScore)));
   };
   
-  if (!isOpen || !studySession) return null;
+  if (!isOpen || !lecture) return null;
   
   return (
-    <div className="quiz-modal-overlay" onClick={onClose}>
-      <div className="quiz-modal-content" onClick={e => e.stopPropagation()}>
+    <div className="quiz-modal-overlay">
+      <div className="quiz-modal-content">
         <div className="quiz-modal-header">
-          <h2>Track Study Progress</h2>
-          <button className="close-btn" onClick={onClose}>×</button>
+          <h2>Quiz for Lecture</h2>
+          <button className="close-btn" onClick={onClose}>&times;</button>
         </div>
         
         <div className="quiz-modal-body">
-          <p>
-            Record your progress for this study session on <strong>{formatDate(studySession.startDate)}</strong> from <strong>{formatTime(studySession.startDate)}</strong> to <strong>{formatTime(studySession.endDate)}</strong>.
-          </p>
-          
-          <div className="lecture-selection">
-            <h3>Select a lecture you studied:</h3>
-            
-            {weekLectures.length > 0 ? (
-              <div className="lecture-options">
-                {weekLectures.map(lecture => {
-                  const previousScore = getLecturePreviousScore(lecture);
-                  
-                  return (
-                    <div 
-                      key={lecture.id} 
-                      className={`lecture-option ${selectedLecture === lecture.id ? 'selected' : ''} ${previousScore !== null ? 'has-score' : ''}`}
-                      onClick={() => setSelectedLecture(lecture.id)}
-                    >
-                      <div className="radio-button">
-                        <div className={`radio-inner ${selectedLecture === lecture.id ? 'checked' : ''}`} />
-                      </div>
-                      <div className="lecture-info">
-                        <h4>{lecture.title}</h4>
-                        <p>{lecture.description}</p>
-                        <small>
-                          {formatDate(lecture.startDate)} at {formatTime(lecture.startDate)}
-                          {previousScore !== null && (
-                            <span className="previous-score">
-                              Previous score: {previousScore}%
-                            </span>
-                          )}
-                        </small>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="no-lectures">No lectures found for this week.</p>
-            )}
+          <div className="lecture-details">
+            <h3>{lecture.title || 'Untitled Lecture'}</h3>
+            {lecture.description && <p>{lecture.description}</p>}
+            <p className="lecture-metadata">
+              {lecture.startDate && (
+                <span>Date: {formatDate(lecture.startDate)} at {formatTime(lecture.startDate)}</span>
+              )}
+            </p>
           </div>
           
-          {selectedLecture && (
-            <div className="score-input-container">
-              <label htmlFor="score-input">Your progress score (0-100%):</label>
-              <div className="score-input-wrapper">
-                <input
-                  id="score-input"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={score}
-                  onChange={handleScoreChange}
-                  className="score-input"
-                />
-                <span className="percentage-sign">%</span>
-              </div>
-              <div className="score-slider-container">
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={score}
-                  onChange={handleScoreChange}
-                  className="score-slider"
-                />
-                <div className="score-labels">
-                  <span>0%</span>
-                  <span>25%</span>
-                  <span>50%</span>
-                  <span>75%</span>
-                  <span>100%</span>
-                </div>
+          <div className="score-input-container">
+            <label htmlFor="quiz-score">Enter your quiz score (0-100%):</label>
+            <div className="score-input-wrapper">
+              <input
+                id="quiz-score"
+                type="number"
+                className="score-input"
+                value={score}
+                onChange={handleScoreChange}
+                min="0"
+                max="100"
+              />
+              <span className="percentage-sign">%</span>
+            </div>
+            <div className="score-slider-container">
+              <input
+                type="range"
+                className="score-slider"
+                min="0"
+                max="100"
+                value={score}
+                onChange={handleScoreChange}
+              />
+              <div className="score-labels">
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
               </div>
             </div>
-          )}
+          </div>
           
           {errorMessage && (
             <div className="error-message">
@@ -461,12 +396,12 @@ const StudySessionQuizModal: React.FC<StudySessionQuizModalProps> = ({
         
         <div className="quiz-modal-footer">
           <button className="cancel-btn" onClick={onClose}>Cancel</button>
-          <button 
-            className="start-quiz-btn" 
-            disabled={!selectedLecture || isLoading}
+          <button
+            className="start-quiz-btn"
             onClick={handleSaveProgress}
+            disabled={isLoading}
           >
-            {isLoading ? 'Saving...' : 'Save Progress'}
+            {isLoading ? 'Saving...' : 'Save Score'}
           </button>
         </div>
       </div>
@@ -474,4 +409,4 @@ const StudySessionQuizModal: React.FC<StudySessionQuizModalProps> = ({
   );
 };
 
-export default StudySessionQuizModal; 
+export default LectureQuizModal; 

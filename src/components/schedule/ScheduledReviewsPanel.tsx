@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { generateClient } from 'aws-amplify/api';
 import type { Schema } from '../../../amplify/data/resource';
-import * as hlrService from './hlrService';
 import './ScheduledReviewsPanel.css';
-import { useTimeContext } from '../../context/TimeContext';
+
+type Nullable<T> = T | null;
 
 interface ScheduledReviewsProps {
   userId: string;
@@ -27,46 +27,20 @@ interface LectureInfo {
   courseId?: string;
 }
 
-interface DeleteDialogOptions {
-  isOpen: boolean;
-  type: 'all' | 'course' | 'lecture';
-  courseId?: string;
-  lectureId?: string;
-  title?: string;
-}
-
 const client = generateClient<Schema>();
 
 const ScheduledReviewsPanel: React.FC<ScheduledReviewsProps> = ({ userId }) => {
-  const { getCurrentTime } = useTimeContext();
   const [upcomingReviews, setUpcomingReviews] = useState<ScheduledReview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lectures, setLectures] = useState<Record<string, LectureInfo>>({});
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteDialog, setDeleteDialog] = useState<DeleteDialogOptions>({
-    isOpen: false,
-    type: 'all'
-  });
-  const [showManagementOptions, setShowManagementOptions] = useState(false);
-  const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (userId) {
       fetchScheduledReviews();
     }
   }, [userId]);
-
-  // Clear success message after 3 seconds
-  useEffect(() => {
-    if (deleteSuccess) {
-      const timer = setTimeout(() => {
-        setDeleteSuccess(null);
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [deleteSuccess]);
 
   const fetchScheduledReviews = async () => {
     setIsLoading(true);
@@ -79,8 +53,6 @@ const ScheduledReviewsPanel: React.FC<ScheduledReviewsProps> = ({ userId }) => {
           userId: { eq: userId }
         }
       });
-      
-      console.log('Scheduled reviews response:', response);
       
       if (response.data && response.data.length > 0) {
         // Filter for upcoming reviews
@@ -99,7 +71,6 @@ const ScheduledReviewsPanel: React.FC<ScheduledReviewsProps> = ({ userId }) => {
           }))
           .sort((a, b) => new Date(a.reviewDate).getTime() - new Date(b.reviewDate).getTime());
         
-        console.log('Filtered upcoming reviews:', upcoming.length);
         setUpcomingReviews(upcoming);
         
         // Fetch lecture info for these reviews
@@ -196,222 +167,39 @@ const ScheduledReviewsPanel: React.FC<ScheduledReviewsProps> = ({ userId }) => {
   };
 
   const getDaysUntil = (dateString: string) => {
-    try {
-      const reviewDate = new Date(dateString);
-      // Use the global current time for calculations
-      const now = getCurrentTime();
-      
-      // Reset time part for accurate day calculation
-      now.setHours(0, 0, 0, 0);
-      const tempReviewDate = new Date(reviewDate);
-      tempReviewDate.setHours(0, 0, 0, 0);
-      
-      const diffTime = tempReviewDate.getTime() - now.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      if (diffDays === 0) return 'Today';
-      if (diffDays === 1) return 'Tomorrow';
-      if (diffDays < 0) return `${Math.abs(diffDays)} days ago`;
-      return `In ${diffDays} days`;
-    } catch (e) {
-      console.error('Error calculating days until:', e);
-      return 'Unknown';
-    }
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = date.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    return `In ${diffDays} days`;
   };
   
   const getDaysSinceLastReview = (lastReviewDate: string) => {
-    try {
-      const reviewDate = new Date(lastReviewDate);
-      // Use the global current time for calculations
-      const now = getCurrentTime();
-      
-      // Reset time part for accurate day calculation
-      now.setHours(0, 0, 0, 0);
-      const tempReviewDate = new Date(reviewDate);
-      tempReviewDate.setHours(0, 0, 0, 0);
-      
-      const diffTime = now.getTime() - tempReviewDate.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      
-      if (diffDays === 0) return 'Today';
-      if (diffDays === 1) return 'Yesterday';
-      return `${diffDays} days ago`;
-    } catch (e) {
-      console.error('Error calculating days since last review:', e);
-      return 'Unknown';
-    }
-  };
-
-  // Toggle the management options section
-  const toggleManagementOptions = () => {
-    setShowManagementOptions(!showManagementOptions);
-  };
-
-  // Open confirmation dialog for deleting
-  const openDeleteDialog = (type: 'all' | 'course' | 'lecture', courseId?: string, lectureId?: string, title?: string) => {
-    setDeleteDialog({
-      isOpen: true,
-      type,
-      courseId,
-      lectureId,
-      title
-    });
-  };
-
-  // Close the delete confirmation dialog
-  const closeDeleteDialog = () => {
-    setDeleteDialog({
-      ...deleteDialog,
-      isOpen: false
-    });
-  };
-
-  // Handle the actual deletion
-  const handleDelete = async () => {
-    if (!userId) return;
+    const reviewDate = new Date(lastReviewDate);
+    const now = new Date();
+    const diffTime = now.getTime() - reviewDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     
-    setIsDeleting(true);
-    
-    try {
-      const { type, courseId, lectureId } = deleteDialog;
-      
-      // Delete both progress and scheduled reviews
-      const result = await hlrService.syncDeleteUserData(
-        userId,
-        type === 'course' ? courseId : undefined,
-        type === 'lecture' ? lectureId : undefined
-      );
-      
-      // Show success message
-      setDeleteSuccess(`Successfully deleted ${result.reviewsDeleted} reviews and ${result.progressDeleted} progress records.`);
-      
-      // Refresh reviews
-      await fetchScheduledReviews();
-      
-      // Close dialog
-      closeDeleteDialog();
-    } catch (error) {
-      console.error('Error during deletion:', error);
-      setError('Failed to delete records. Please try again.');
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  // Get unique course IDs from reviews
-  const getUniqueCourses = (): {id: string, name: string}[] => {
-    const courseMap = new Map<string, string>();
-    
-    upcomingReviews.forEach(review => {
-      if (!courseMap.has(review.courseId)) {
-        const lectureName = lectures[review.lectureId]?.title || '';
-        const courseName = lectureName.split(':')[0]?.trim() || review.courseId;
-        courseMap.set(review.courseId, courseName);
-      }
-    });
-    
-    return Array.from(courseMap.entries()).map(([id, name]) => ({ id, name }));
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    return `${diffDays} days ago`;
   };
 
   return (
     <div className="scheduled-reviews-panel">
       <div className="panel-header">
         <h2>Upcoming Review Sessions</h2>
-        <div className="panel-actions">
-          <button 
-            className="manage-button" 
-            onClick={toggleManagementOptions}
-            aria-label="Manage reviews"
-          >
-            ⚙️
-          </button>
-          <button 
-            className="refresh-button" 
-            onClick={fetchScheduledReviews} 
-            aria-label="Refresh reviews"
-          >
-            ⟳
-          </button>
-        </div>
+        <button 
+          className="refresh-button" 
+          onClick={fetchScheduledReviews} 
+          aria-label="Refresh reviews"
+        >
+          ⟳
+        </button>
       </div>
-      
-      {/* Success message */}
-      {deleteSuccess && (
-        <div className="success-message">
-          {deleteSuccess}
-        </div>
-      )}
-      
-      {/* Management options */}
-      {showManagementOptions && (
-        <div className="management-options">
-          <h3>Manage Your Reviews</h3>
-          <p className="management-description">
-            Clear your progress and scheduled reviews. This action cannot be undone.
-          </p>
-          
-          <div className="management-actions">
-            <button 
-              className="delete-all-button"
-              onClick={() => openDeleteDialog('all')}
-              disabled={upcomingReviews.length === 0}
-            >
-              Clear All Reviews & Progress
-            </button>
-          </div>
-          
-          {upcomingReviews.length > 0 && (
-            <div className="course-management">
-              <h4>Clear by Course</h4>
-              <div className="course-list">
-                {getUniqueCourses().map(course => (
-                  <div key={course.id} className="course-item">
-                    <span className="course-name">{course.name}</span>
-                    <button 
-                      className="delete-course-button"
-                      onClick={() => openDeleteDialog('course', course.id, undefined, course.name)}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-      
-      {/* Delete confirmation dialog */}
-      {deleteDialog.isOpen && (
-        <div className="delete-dialog-overlay">
-          <div className="delete-dialog">
-            <h3>Confirm Deletion</h3>
-            <p>
-              {deleteDialog.type === 'all' && 'Are you sure you want to clear all your progress and scheduled reviews?'}
-              {deleteDialog.type === 'course' && `Are you sure you want to clear all progress and reviews for ${deleteDialog.title || 'this course'}?`}
-              {deleteDialog.type === 'lecture' && `Are you sure you want to clear progress and reviews for ${deleteDialog.title || 'this lecture'}?`}
-            </p>
-            <p className="warning-text">This action cannot be undone.</p>
-            
-            <div className="dialog-actions">
-              <button 
-                className="cancel-button"
-                onClick={closeDeleteDialog}
-                disabled={isDeleting}
-              >
-                Cancel
-              </button>
-              <button 
-                className="confirm-delete-button"
-                onClick={handleDelete}
-                disabled={isDeleting}
-              >
-                {isDeleting ? 'Deleting...' : 'Confirm Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       
       {isLoading ? (
         <div className="loading-indicator">Loading your scheduled reviews...</div>
@@ -455,15 +243,6 @@ const ScheduledReviewsPanel: React.FC<ScheduledReviewsProps> = ({ userId }) => {
                         <p>Last reviewed: {formatDate(review.lastReviewDate)} ({getDaysSinceLastReview(review.lastReviewDate)})</p>
                         <p>Course: {lecture?.courseId || review.courseId || 'Unknown'}</p>
                       </div>
-                      <button 
-                        className="delete-review-button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openDeleteDialog('lecture', undefined, review.lectureId, title);
-                        }}
-                      >
-                        Clear this review
-                      </button>
                     </div>
                   )}
                 </div>

@@ -9,7 +9,6 @@ import Home from './pages/Home';
 import Schedule from './pages/Schedule';
 import Preferences from './pages/Preferences';
 import CourseSelection from './components/CourseSelection';
-import { TimeProvider } from './context/TimeContext';
 import './App.css';
 import './components/CourseSelection.css';
 
@@ -46,7 +45,6 @@ async function checkAndCreateUserFile(userId: string) {
     await getUrl({
       key: fileName
     });
-    console.log('File exists');
   } catch (error: any) {
     if (error.name === 'StorageError') {
       // File doesn't exist, create it
@@ -58,7 +56,6 @@ async function checkAndCreateUserFile(userId: string) {
             contentType: 'application/json'
           }
         });
-        console.log('File created');
       } catch (uploadError) {
         console.error('Error creating file:', uploadError);
         throw uploadError;
@@ -85,6 +82,23 @@ function App() {
     }
   }, [user, preferencesInitialized]);
 
+  useEffect(() => {
+    // Check if file exists
+    fetch('app.css')
+      .then(() => {
+        // File exists
+      })
+      .catch(() => {
+        // File doesn't exist
+        fetch('create-app-css', {
+          method: 'POST'
+        }).then(() => {
+          // File created
+        }).catch(err => {
+          // Error creating file
+        });
+      });
+  }, []);
 
   const handleCoursesChange = (selectedCourses: string[]) => {
     console.log('Selected courses:', selectedCourses);
@@ -92,19 +106,17 @@ function App() {
   };
 
   return (
-    <TimeProvider>
-      <div className="app">
-        <Navigation />
-        <main className="main-content">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/schedule" element={<Schedule />} />
-            <Route path="/preferences" element={<Preferences />} />
-            <Route path="/courses" element={<CourseSelection onCoursesChange={handleCoursesChange} />} />
-          </Routes>
-        </main>
-      </div>
-    </TimeProvider>
+    <div className="app">
+      <Navigation />
+      <main className="main-content">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/schedule" element={<Schedule />} />
+          <Route path="/preferences" element={<Preferences />} />
+          <Route path="/courses" element={<CourseSelection onCoursesChange={handleCoursesChange} />} />
+        </Routes>
+      </main>
+    </div>
   );
 }
 

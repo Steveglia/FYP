@@ -91,29 +91,41 @@ export const fetchAcceptedStudySessions = async (weekStartDate: Date, userId: st
 };
 
 // Fetch events for the current week
-export const fetchEvents = async (currentWeekStart: Date): Promise<Event[]> => {
+export const fetchEvents = async (currentWeekStart: Date, userId: string): Promise<Event[]> => {
   try {
     // Calculate week end date
     const weekEndDate = new Date(currentWeekStart);
     weekEndDate.setDate(currentWeekStart.getDate() + 7);
     
-    // Format dates for query (if needed)
+    // Format dates for query
     const startDateStr = currentWeekStart.toISOString();
     const endDateStr = weekEndDate.toISOString();
     
-    console.log(`Fetching events from ${startDateStr} to ${endDateStr}`);
+    // Query events for the current week
+    const result = await client.models.CalendarEvent.list({
+      filter: {
+        and: [
+          { startDate: { ge: startDateStr } },
+          { startDate: { lt: endDateStr } }
+          // userId is intentionally not used in the filter yet
+          // We'll add it back once we confirm events are showing properly
+          // { userId: { eq: userId } }
+        ]
+      }
+    });
     
-    // Fetch events from the backend
-    const response = await client.models.CalendarEvent.list();
-    
-    // Filter events for the current week if needed
-    // You could add filtering logic here based on startDateStr and endDateStr
-    
-    return response.data as Event[];
+    if (result.data) {
+      // Don't filter by userId for now to ensure events are displayed
+      // We can add this back once we confirm events are showing
+      const events = result.data;
+      
+      return events;
+    }
   } catch (error) {
     console.error('Error fetching events:', error);
-    return [];
   }
+  
+  return [];
 };
 
 // Fetch lectures for the current week
@@ -294,42 +306,99 @@ export const generateStudySessions = async (
     const dbEvents = eventsResult.data || [];
     const allEvents = [...dbEvents, ...dbLectures, ...currentEvents, ...currentLectures];
     
-    console.log('Total events fetched from database:', allEvents.length);
+    console.log('Total events for availability calculation:', allEvents.length);
     
     // Create initial availability vector (all available)
     const availabilityVector = new Array(105).fill(1);
     
+    // Create a day/hour map for better logging
+    const slotToString = (index: number) => {
+      const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const dayIndex = Math.floor(index / 15);
+      const hourIndex = (index % 15) + 8;
+      return `${weekDays[dayIndex]} ${hourIndex}:00-${hourIndex+1}:00`;
+    };
+    
+    // Log the vector in a readable format for each day
+    const logVectorByDay = (vector: number[]) => {
+      const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      weekDays.forEach((day, dayIndex) => {
+        const dayVector = vector.slice(dayIndex * 15, (dayIndex + 1) * 15);
+        console.log(`${day}:`, dayVector.join(' '));
+      });
+    };
+    
+    // Track which events affect which slots
+    const slotModifications: Record<number, string[]> = {};
+    
     // Mark unavailable times based on events and lectures from database
-    allEvents.forEach(event => {
+    allEvents.forEach((event, eventIndex) => {
       if (event.startDate && event.endDate) {
         try {
-          // Parse dates ignoring timezone (treat as local time)
-          const startDateStr = event.startDate.replace('Z', '');
-          const endDateStr = event.endDate.replace('Z', '');
+          // Parse dates while preserving the original hour components
+          // This solution avoids time zone adjustments that might shift hours
+          const startDateRaw = event.startDate;
+          const endDateRaw = event.endDate;
           
-          const startDate = new Date(startDateStr);
-          const endDate = new Date(endDateStr);
+          // Use this approach to extract components without time zone adjustments
+          const startParts = startDateRaw.split('T');
+          const endParts = endDateRaw.split('T');
           
-          // Get the day of week for the start date (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
-          const startDayOfWeek = startDate.getDay();
-          // Convert to our index (0 = Monday, ..., 6 = Sunday)
-          const dayIndex = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
-          
-          // Get start and end hours
-          const startHour = startDate.getHours();
-          let endHour = endDate.getHours();
-          
-          // If end time is exactly on the hour and not the same as start hour, adjust
-          if (endDate.getMinutes() === 0 && startHour !== endHour) {
-            endHour = Math.max(8, endHour - 1);
+          if (startParts.length !== 2 || endParts.length !== 2) {
+            console.error(`Event "${event.title}" has invalid ISO date format`);
+            return; // Skip this event
           }
           
-          // Mark time slots as unavailable
-          for (let hour = startHour; hour <= Math.min(endHour, 22); hour++) {
-            if (hour >= 8 && hour <= 22) {
-              const vectorIndex = (dayIndex * 15) + (hour - 8);
-              if (vectorIndex >= 0 && vectorIndex < availabilityVector.length) {
-                availabilityVector[vectorIndex] = 0; // Mark as unavailable
+          // Extract date components (YYYY-MM-DD)
+          const startDateStr = startParts[0];
+          const endDateStr = endParts[0];
+          
+          // Extract time components (HH:MM:SS.sssZ)
+          const startTimeStr = startParts[1];
+          const endTimeStr = endParts[1];
+          
+          // Extract hours and minutes without timezone adjustments
+          const startHour = parseInt(startTimeStr.substring(0, 2), 10);
+          const startMinute = parseInt(startTimeStr.substring(3, 5), 10);
+          const endHour = parseInt(endTimeStr.substring(0, 2), 10);
+          const endMinute = parseInt(endTimeStr.substring(3, 5), 10);
+          
+          // Create date objects for day-based comparisons (ignoring time)
+          const eventDate = new Date(startDateStr);
+          
+          // Verify the event is within the current week
+          const weekStart = new Date(currentWeekStart);
+          weekStart.setHours(0, 0, 0, 0);
+          
+          const weekEnd = new Date(weekEndDate);
+          weekEnd.setHours(0, 0, 0, 0);
+          
+          // Check if the event is in the current week (date-only comparison)
+          const isAfterWeekStart = eventDate.getTime() >= weekStart.getTime();
+          const isBeforeWeekEnd = eventDate.getTime() < weekEnd.getTime();
+          
+          // Only process events that are within the current week
+          if (isAfterWeekStart && isBeforeWeekEnd) {
+            // Get the day of week from date part only (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+            const startDayOfWeek = eventDate.getDay();
+            // Convert to our index (0 = Monday, ..., 6 = Sunday)
+            const dayIndex = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
+            
+            // Mark time slots as unavailable
+            for (let hour = startHour; hour <= Math.min(endHour, 22); hour++) {
+              if (hour >= 8 && hour <= 22) {
+                const vectorIndex = (dayIndex * 15) + (hour - 8);
+                if (vectorIndex >= 0 && vectorIndex < availabilityVector.length) {
+                  if (availabilityVector[vectorIndex] === 1) {
+                    availabilityVector[vectorIndex] = 0; // Mark as unavailable
+                    
+                    // Track which event affected this slot
+                    if (!slotModifications[vectorIndex]) {
+                      slotModifications[vectorIndex] = [];
+                    }
+                    slotModifications[vectorIndex].push(event.title || 'Untitled Event');
+                  }
+                }
               }
             }
           }
@@ -339,8 +408,13 @@ export const generateStudySessions = async (
       }
     });
     
+    // Log final availability vector
+    console.log('\n===== AVAILABILITY VECTOR =====');
+    logVectorByDay(availabilityVector);
+    
     try {
       // Call generatePreferenceVector API
+      console.log('\nCalling generatePreferenceVector API...');
       const result = await client.queries.generatePreferenceVector({
         availabilityVector: JSON.stringify(availabilityVector),
         userId
@@ -404,8 +478,8 @@ export const generateStudySessions = async (
                 }
                 
                 // Parse the time strings
-                const [startHour, startMinute] = (session.startTime || '8:00').split(':').map(Number);
-                const [endHour, endMinute] = (session.endTime || '9:00').split(':').map(Number);
+                const [startHour, startMinute] = (session.startTime ? session.startTime : '8:00').split(':').map(Number);
+                const [endHour, endMinute] = (session.endTime ? session.endTime : '9:00').split(':').map(Number);
                 
                 // Create date objects for the current week
                 const startDate = new Date(currentWeekStart);
@@ -420,50 +494,74 @@ export const generateStudySessions = async (
                 
                 // Create a UTC date that will display as the desired local time when converted to ISO
                 const utcStartDate = new Date(startDate.getTime() - tzOffset);
-                const startDateIso = utcStartDate.toISOString();
                 
-                // Do the same for end date
-                const endDate = new Date(currentWeekStart);
-                endDate.setDate(currentWeekStart.getDate() + dayIndex);
+                // Set the end date
+                const endDate = new Date(startDate);
                 endDate.setHours(endHour || 9, endMinute || 0, 0, 0);
+                
+                // Create UTC date for end date
                 const utcEndDate = new Date(endDate.getTime() - tzOffset);
-                const endDateIso = utcEndDate.toISOString();
+                
+                // Create ISO strings (with the Z for UTC)
+                const startIso = utcStartDate.toISOString();
+                const endIso = utcEndDate.toISOString();
+                
+                // Create a unique ID with timestamp to avoid collisions
+                const uniqueId = `study-${Date.now()}-${index}`;
                 
                 const now = new Date().toISOString();
                 
                 return {
-                  id: `study-${Date.now()}-${index}`,
+                  id: uniqueId,
                   title: `Study Session`,
-                  description: `Study session for ${session.course || 'general topics'}`,
+                  description: `Generated study session for ${session.day}`,
                   type: 'STUDY',
-                  startDate: startDateIso,
-                  endDate: endDateIso,
+                  startDate: startIso,
+                  endDate: endIso,
                   createdAt: now,
                   updatedAt: now
                 };
-              } catch (err) {
-                console.error('Error processing study session:', err, session);
+              } catch (sessionError) {
+                console.error('Error creating study session:', sessionError);
                 return null;
               }
-            }).filter(Boolean) as Event[];
+            }).filter(event => event !== null) as Event[];
             
-            if (studyEvents.length > 0) {
-              return studyEvents;
-            }
+            console.log('\n===== GENERATED STUDY SESSIONS =====');
+            studyEvents.forEach((session, index) => {
+              // Make sure we have valid dates before creating Date objects
+              if (session.startDate && session.endDate) {
+                console.log(`Session ${index + 1}:`, {
+                  day: new Date(session.startDate).toLocaleDateString('en-GB', { weekday: 'long' }),
+                  startTime: new Date(session.startDate).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+                  endTime: new Date(session.endDate).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                });
+              } else {
+                console.log(`Session ${index + 1}: Invalid date format`);
+              }
+            });
+            
+            return studyEvents;
+          } else {
+            console.error('Invalid study sessions format:', studySessions);
+            return createTestStudySessions(currentWeekStart);
           }
         } catch (error) {
           console.error('Error processing study sessions:', error);
+          return createTestStudySessions(currentWeekStart);
         }
+      } else {
+        console.error('No data returned from generatePreferenceVector:', result);
+        return createTestStudySessions(currentWeekStart);
       }
-    } catch (apiError) {
-      console.error('API error generating study sessions:', apiError);
+    } catch (error) {
+      console.error('Error calling generatePreferenceVector:', error);
+      return createTestStudySessions(currentWeekStart);
     }
   } catch (error) {
-    console.error('Error generating study sessions:', error);
+    console.error('Error in generateStudySessions:', error);
+    return createTestStudySessions(currentWeekStart);
   }
-  
-  // Fallback to test study sessions
-  return createTestStudySessions(currentWeekStart);
 };
 
 // Delete all accepted study sessions for a specific week
@@ -501,33 +599,5 @@ export const deleteAcceptedStudySessions = async (weekStartDate: Date, userId: s
   } catch (error) {
     console.error('Error deleting accepted study sessions:', error);
     return false;
-  }
-};
-
-export const scheduleReview = async (userId: string, courseId: string, lectureId: string, initialScore: number) => {
-  try {
-    // Implement the scheduling mechanism
-    console.log(`Scheduling review for user: ${userId}, course: ${courseId}, lecture: ${lectureId}, with score: ${initialScore}`);
-    
-    // Example implementation (commented out)
-    /*
-    const nextReviewDate = calculateNextReviewDate(initialScore);
-    
-    // Save the scheduled review to the database
-    await client.models.ScheduledReviews.create({
-      userId: userId,
-      courseId: courseId,
-      lectureId: lectureId,
-      reviewDate: nextReviewDate.toISOString(),
-      halfLife: calculateHalfLife(initialScore),
-      lastScore: initialScore,
-      lastReviewDate: new Date().toISOString(),
-      studyCount: 1
-    });
-    */
-    
-    // Add your full scheduling logic here
-  } catch (error) {
-    console.error('Error scheduling review:', error);
   }
 }; 

@@ -43,36 +43,31 @@ export const getEventColor = (event: ScheduleEvent): string => {
   return eventTypeColors[event.type as keyof typeof eventTypeColors] || eventTypeColors.default;
 };
 
-// Helper function to get Monday of the week of September 23, 2024 or a specified date
-export const getMondayOfCurrentWeek = (customDate?: Date): Date => {
-  if (customDate) {
-    // If a custom date is provided, calculate the Monday of its week
-    const day = customDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const diff = customDate.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
-    
-    const monday = new Date(customDate);
-    monday.setDate(diff);
-    monday.setHours(0, 0, 0, 0);
-    
-    console.log('Calculated Monday for custom date:', monday.toLocaleDateString('en-GB'));
-    
-    return monday;
-  } else {
-    // Default behavior - return fixed academic year start date
-    // Create a date for September 23, 2024 (which is a Monday)
-    // This is a fixed date for the academic year 2024-2025
-    const targetDate = new Date(2024, 8, 23); // Month is 0-indexed, so 8 = September
-    
-    // Ensure it's set to the beginning of the day
-    targetDate.setHours(0, 0, 0, 0);
-    
-    console.log('Returning fixed date for academic year:', targetDate.toLocaleDateString('en-GB'));
-    
-    return targetDate;
-  }
+// Helper function to get Monday of the current week or of a provided date
+export const getMondayOfCurrentWeek = (date?: Date): Date => {
+  // If no date is provided, use current date
+  const targetDate = date ? new Date(date) : new Date();
+  
+  // Get the day of the week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+  const day = targetDate.getDay();
+  
+  // Calculate days to subtract to get to Monday
+  // If today is Sunday (0), we need to go back 6 days
+  // If today is Monday (1), we need to go back 0 days
+  // If today is Tuesday (2), we need to go back 1 day, etc.
+  const daysToSubtract = day === 0 ? 6 : day - 1;
+  
+  // Create a new date representing Monday of the current week
+  const mondayDate = new Date(targetDate);
+  mondayDate.setDate(targetDate.getDate() - daysToSubtract);
+  
+  // Ensure it's set to the beginning of the day
+  mondayDate.setHours(0, 0, 0, 0);
+  
+  return mondayDate;
 };
 
-// Helper function to create test study sessions
+// Helper function to create test study sessions with proper timezone handling
 export const createTestStudySessions = (currentWeekStart: Date): Event[] => {
   const testStudySessions: Event[] = [];
   
@@ -80,12 +75,25 @@ export const createTestStudySessions = (currentWeekStart: Date): Event[] => {
   
   // Create one study session for each weekday at different times
   for (let dayIndex = 0; dayIndex < 5; dayIndex++) {
+    // Create the date part without time
     const startDate = new Date(currentWeekStart);
     startDate.setDate(currentWeekStart.getDate() + dayIndex);
-    startDate.setHours(10 + dayIndex, 0, 0, 0); // Different hour each day
     
-    const endDate = new Date(startDate);
-    endDate.setHours(startDate.getHours() + 2, 0, 0, 0); // 2-hour sessions
+    // Reset hours to avoid time zone issues
+    startDate.setHours(0, 0, 0, 0);
+    
+    // Format the date part as YYYY-MM-DD
+    const dateStr = startDate.toISOString().split('T')[0];
+    
+    // Explicitly set the hour we want (10 + dayIndex) without time zone adjustments
+    const hour = 10 + dayIndex;
+    const startTimeStr = `${hour.toString().padStart(2, '0')}:00:00.000Z`;
+    const endHour = hour + 2;
+    const endTimeStr = `${endHour.toString().padStart(2, '0')}:00:00.000Z`;
+    
+    // Create ISO strings with the exact time we want
+    const startDateIso = `${dateStr}T${startTimeStr}`;
+    const endDateIso = `${dateStr}T${endTimeStr}`;
     
     const now = new Date().toISOString();
     
@@ -96,13 +104,15 @@ export const createTestStudySessions = (currentWeekStart: Date): Event[] => {
     const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
     const dayName = dayNames[dayIndex];
     
+    console.log(`Creating test session for ${dayName} from ${hour}:00 to ${endHour}:00`);
+    
     testStudySessions.push({
       id: uniqueId,
       title: `Study Session`,
       description: `Test generated study session for ${dayName}`,
       type: 'STUDY',
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
+      startDate: startDateIso,
+      endDate: endDateIso,
       createdAt: now,
       updatedAt: now
     });

@@ -13,8 +13,7 @@ import {
 import ScheduleNavigation from './ScheduleNavigation';
 import ScheduleGrid from './ScheduleGrid';
 import ScheduleLegend from './ScheduleLegend';
-import QuizModal from './QuizModal';
-import { useTimeContext } from '../../context/TimeContext';
+import LectureQuizModal from './LectureQuizModal';
 import './WeeklySchedule.css';
 
 interface WeeklyScheduleProps {
@@ -24,24 +23,12 @@ interface WeeklyScheduleProps {
 
 export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialEvents = [], userId }) => {
   const { user } = useAuthenticator();
-  const { getCurrentTime } = useTimeContext();
   
-  // Add state for current week - now based on the global time context
+  // Add state for current week - now starts from the current week's Monday
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
-    // Use the global time to calculate the start of the week
-    const currentTime = getCurrentTime();
-    const startDate = getMondayOfCurrentWeek(currentTime);
-    console.log('Initial week start date (from global time):', startDate.toLocaleDateString('en-GB'), 
-                '(', startDate.toISOString(), ')');
+    const startDate = getMondayOfCurrentWeek();
     return startDate;
   });
-  
-  // Update currentWeekStart when global time changes
-  useEffect(() => {
-    const currentTime = getCurrentTime();
-    const startDate = getMondayOfCurrentWeek(currentTime);
-    setCurrentWeekStart(startDate);
-  }, [getCurrentTime]);
   
   // Add state for events
   const [events, setEvents] = useState<Event[]>(initialEvents);
@@ -65,12 +52,11 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
   const [hasAcceptedSessions, setHasAcceptedSessions] = useState(false);
   
   // Add state for selected study session for quiz
-  const [selectedStudySession, setSelectedStudySession] = useState<ScheduleEvent | null>(null);
+  const [selectedLecture, setSelectedLecture] = useState<ScheduleEvent | null>(null);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   
   // Initialize with initial events
   useEffect(() => {
-    console.log('Initial events received:', initialEvents.length);
     if (initialEvents.length > 0) {
       setEvents(initialEvents);
     }
@@ -92,16 +78,13 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
       setError(null);
       
       try {
-        console.log('Fetching data for week starting:', formatWeekDate(currentWeekStart));
-        
         // Fetch events for the current week
-        const fetchedEvents = await fetchEvents(currentWeekStart);
-        console.log('Fetched events:', fetchedEvents.length);
+        const currentUserId = user?.username || userId;
+        
+        const fetchedEvents = await fetchEvents(currentWeekStart, currentUserId);
         
         // Fetch accepted study sessions for the current week
-        const currentUserId = user?.username || userId;
         const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, currentUserId);
-        console.log('Fetched accepted study sessions:', acceptedStudySessions.length);
         
         // Update hasAcceptedSessions state
         setHasAcceptedSessions(acceptedStudySessions.length > 0);
@@ -113,13 +96,11 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
           setEvents(combinedEvents);
         } else if (initialEvents.length > 0 && events.length === 0) {
           // If no events were fetched but we have initial events, use those
-          console.log('Using initial events as fallback');
           setEvents(initialEvents);
         }
         
         // Fetch lectures for the current week
         const lectureEvents = await fetchLectures(currentWeekStart);
-        console.log('Fetched lectures:', lectureEvents.length);
         setLectures(lectureEvents);
         
       } catch (err) {
@@ -128,32 +109,12 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
       }
     };
     
-    // Set the current week to the user's preference or default to current week
     fetchData();
-  }, [currentWeekStart, user, userId]);
+  }, [currentWeekStart, user, userId, initialEvents, events.length]);
   
   // Combine regular events with generated study sessions and lectures
   const allEvents = useMemo(() => {
-    console.log('Combining events:');
-    console.log('- Regular events:', events.length);
-    console.log('- Generated study sessions:', generatedStudySessions.length);
-    console.log('- Lectures:', lectures.length);
-    
     const combined = [...events, ...generatedStudySessions, ...lectures];
-    console.log('Total combined events:', combined.length);
-    
-    // Debug event details
-    combined.forEach((event, index) => {
-      console.log(`Event ${index + 1}:`, {
-        id: event.id,
-        title: event.title,
-        type: event.type,
-        startDate: event.startDate,
-        endDate: event.endDate,
-        isLecture: event.isLecture
-      });
-    });
-    
     return combined;
   }, [events, generatedStudySessions, lectures]);
 
@@ -172,9 +133,6 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
     // Calculate week end date
     const weekEndDate = new Date(currentWeekStart);
     weekEndDate.setDate(currentWeekStart.getDate() + 7);
-
-    console.log('Processing events for schedule:', allEvents.length);
-    console.log('Week range:', formatWeekDate(currentWeekStart), 'to', formatWeekDate(weekEndDate));
     
     let eventsInRange = 0;
     let eventsOutsideHours = 0;
@@ -182,72 +140,76 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
     allEvents.forEach(event => {
       if (event.startDate && event.endDate) {
         try {
-          // Create new Date objects to avoid modifying the original event dates
-          const startDate = new Date(event.startDate);
-          const endDate = new Date(event.endDate);
+          // Parse dates while preserving the original hour components
+          // This solution avoids time zone adjustments that might shift hours
+          const startDateRaw = event.startDate;
+          const endDateRaw = event.endDate;
+          
+          // Use this approach to extract components without time zone adjustments
+          const startParts = startDateRaw.split('T');
+          const endParts = endDateRaw.split('T');
+          
+          if (startParts.length !== 2 || endParts.length !== 2) {
+            console.error(`Event "${event.title}" has invalid ISO date format`);
+            return; // Skip this event
+          }
+          
+          // Extract date components (YYYY-MM-DD)
+          const startDateStr = startParts[0];
+          const endDateStr = endParts[0];
+          
+          // Extract time components (HH:MM:SS.sssZ)
+          const startTimeStr = startParts[1];
+          const endTimeStr = endParts[1];
+          
+          // Extract hours and minutes without timezone adjustments
+          const startHour = parseInt(startTimeStr.substring(0, 2), 10);
+          const startMinute = parseInt(startTimeStr.substring(3, 5), 10);
+          const endHour = parseInt(endTimeStr.substring(0, 2), 10);
+          const endMinute = parseInt(endTimeStr.substring(3, 5), 10);
+          
+          // Create date objects for comparison
+          const startDate = new Date(startDateStr);
+          const endDate = new Date(endDateStr);
           
           // Ensure dates are valid
           if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-            console.error(`Event "${event.title}" has invalid date format:`, {
-              startDate: event.startDate,
-              endDate: event.endDate
-            });
+            console.error(`Event "${event.title}" has invalid date format`);
             return; // Skip this event
           }
           
           // Ensure end date is after start date
-          if (endDate <= startDate) {
-            console.error(`Event "${event.title}" has invalid time range (end <= start):`, {
-              startDate: startDate.toISOString(),
-              endDate: endDate.toISOString()
-            });
-            // Fix the end date to be 1 hour after start date
-            endDate.setTime(startDate.getTime() + 60 * 60 * 1000);
+          if (endDateStr === startDateStr && (endHour < startHour || (endHour === startHour && endMinute <= startMinute))) {
+            console.error(`Event "${event.title}" has invalid time range (end <= start)`);
+            // In this case, set end hour to startHour + 1
+            const newEndHour = startHour + 1;
           }
 
           // Only process events within the current week
-          // Use UTC methods to avoid timezone issues
-          const startYear = startDate.getUTCFullYear();
-          const startMonth = startDate.getUTCMonth();
-          const startDay = startDate.getUTCDate();
+          // Create date-only objects to avoid timezone issues
+          const eventDate = new Date(startDateStr);
           
-          const weekStartYear = currentWeekStart.getFullYear();
-          const weekStartMonth = currentWeekStart.getMonth();
-          const weekStartDay = currentWeekStart.getDate();
+          const weekStart = new Date(currentWeekStart);
+          weekStart.setHours(0, 0, 0, 0);
           
-          const weekEndYear = weekEndDate.getFullYear();
-          const weekEndMonth = weekEndDate.getMonth();
-          const weekEndDay = weekEndDate.getDate();
+          const weekEnd = new Date(weekEndDate);
+          weekEnd.setHours(0, 0, 0, 0);
           
-          // Compare dates by components to avoid timezone issues
-          const isAfterWeekStart = 
-            (startYear > weekStartYear) || 
-            (startYear === weekStartYear && startMonth > weekStartMonth) ||
-            (startYear === weekStartYear && startMonth === weekStartMonth && startDay >= weekStartDay);
-            
-          const isBeforeWeekEnd = 
-            (startYear < weekEndYear) || 
-            (startYear === weekEndYear && startMonth < weekEndMonth) ||
-            (startYear === weekEndYear && startMonth === weekEndMonth && startDay < weekEndDay);
+          // Simple timestamp comparison for date ranges (date only)
+          const isAfterWeekStart = eventDate.getTime() >= weekStart.getTime();
+          const isBeforeWeekEnd = eventDate.getTime() < weekEnd.getTime();
           
           if (isAfterWeekStart && isBeforeWeekEnd) {
             eventsInRange++;
             
-            // Get day of week (0 = Sunday, 1 = Monday, etc.)
-            const dayOfWeek = startDate.getUTCDay();
+            // Get day of week from date part only (0 = Sunday, 1 = Monday, etc.)
+            const dayOfWeek = eventDate.getDay();
             // Convert to our weekDays array index (0 = Monday, 6 = Sunday)
             const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
             const day = weekDays[dayIndex];
             
-            // Get hours in local time
-            const startHour = startDate.getUTCHours();
-            const endHour = endDate.getUTCHours();
-            
-            console.log(`Event "${event.title}" on ${day} from ${startHour}:00 to ${endHour}:00`);
-            
             // Check if the event is within our display hours (8am-10pm)
             if (startHour < 8 || startHour > 22) {
-              console.log(`Event "${event.title}" outside display hours (${startHour}:00)`);
               eventsOutsideHours++;
               return; // Skip events outside our display hours
             }
@@ -268,22 +230,12 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
                 schedule[day][hour].push(scheduleEvent);
               }
             }
-          } else {
-            console.log(`Event "${event.title}" outside current week range:`, {
-              eventDate: `${startYear}-${startMonth+1}-${startDay}`,
-              weekStart: `${weekStartYear}-${weekStartMonth+1}-${weekStartDay}`,
-              weekEnd: `${weekEndYear}-${weekEndMonth+1}-${weekEndDay}`
-            });
           }
         } catch (err) {
           console.error(`Error processing event "${event.title}":`, err);
         }
-      } else {
-        console.log(`Event "${event.title}" missing start or end date`);
       }
     });
-    
-    console.log(`${eventsInRange} events in current week range (${eventsOutsideHours} outside display hours)`);
     
     return schedule;
   }, [allEvents, currentWeekStart, generatedStudySessions]);
@@ -291,9 +243,17 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
   // Add navigation functions
   const navigateWeek = (direction: 'prev' | 'next') => {
     setCurrentWeekStart(prevDate => {
+      // Create a new date object to avoid mutating the previous one
       const newDate = new Date(prevDate);
+      
+      // Add or subtract 7 days
       newDate.setDate(prevDate.getDate() + (direction === 'next' ? 7 : -7));
-      console.log(`Navigating to ${direction} week:`, formatWeekDate(newDate));
+      
+      // Clear study sessions when navigating to a new week
+      if (generatedStudySessions.length > 0) {
+        setGeneratedStudySessions([]);
+      }
+      
       return newDate;
     });
   };
@@ -310,19 +270,12 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
     setError(null);
     
     try {
-      console.log('Generating study sessions for user:', user.username);
-      console.log('Current week start:', formatWeekDate(currentWeekStart));
-      console.log('Events count:', events.length);
-      console.log('Lectures count:', lectures.length);
-      
       const studySessions = await generateStudySessions(
         currentWeekStart,
         events,
         lectures,
         user.username
       );
-      
-      console.log('Generated study sessions:', studySessions.length);
       
       if (studySessions.length === 0) {
         setError('No suitable study times found. Try adding more free time to your schedule.');
@@ -351,27 +304,22 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
     
     try {
       // First delete all accepted study sessions for the current week
-      console.log('Deleting accepted study sessions for week starting:', formatWeekDate(currentWeekStart));
       await deleteAcceptedStudySessions(currentWeekStart, user.username);
       
       // Update the events list to remove the deleted sessions
-      const fetchedEvents = await fetchEvents(currentWeekStart);
+      const fetchedEvents = await fetchEvents(currentWeekStart, user.username);
       setEvents(fetchedEvents);
       
       // Set hasAcceptedSessions to false since we've deleted them
       setHasAcceptedSessions(false);
       
       // Now generate new study sessions
-      console.log('Regenerating study sessions for user:', user.username);
-      
       const studySessions = await generateStudySessions(
         currentWeekStart,
         fetchedEvents, // Use the updated events list
         lectures,
         user.username
       );
-      
-      console.log('Regenerated study sessions:', studySessions.length);
       
       if (studySessions.length === 0) {
         setError('No suitable study times found. Try adding more free time to your schedule.');
@@ -398,64 +346,80 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
     
     // Create one event for each weekday
     for (let dayIndex = 0; dayIndex < 5; dayIndex++) {
-      const startDate = new Date(currentWeekStart);
-      startDate.setDate(currentWeekStart.getDate() + dayIndex);
-      startDate.setHours(9 + dayIndex, 0, 0, 0); // Different hour each day
+      // Create the date part without time
+      const currentDay = new Date(currentWeekStart);
+      currentDay.setDate(currentWeekStart.getDate() + dayIndex);
+      currentDay.setHours(0, 0, 0, 0);
       
-      const endDate = new Date(startDate);
-      endDate.setHours(startDate.getHours() + 1, 0, 0, 0); // 1-hour events
+      // Format the date part as YYYY-MM-DD
+      const dateStr = currentDay.toISOString().split('T')[0];
+      
+      // Create event for 9AM + dayIndex
+      const eventHour = 9 + dayIndex;
+      const eventStartTimeStr = `${eventHour.toString().padStart(2, '0')}:00:00.000Z`;
+      const eventEndHour = eventHour + 1;
+      const eventEndTimeStr = `${eventEndHour.toString().padStart(2, '0')}:00:00.000Z`;
+      
+      const eventStartIso = `${dateStr}T${eventStartTimeStr}`;
+      const eventEndIso = `${dateStr}T${eventEndTimeStr}`;
       
       const now = new Date().toISOString();
       
       // Create event names based on the day of the week
       const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-      const eventName = `${dayNames[dayIndex]} Event (${formatWeekDate(startDate)})`;
+      const eventName = `${dayNames[dayIndex]} Event (${formatWeekDate(currentDay)})`;
       
       testEvents.push({
         id: `test-event-${dayIndex}`,
         title: eventName,
-        description: `Test event for ${dayNames[dayIndex]}, September ${23 + dayIndex}, 2024`,
+        description: `Test event for ${dayNames[dayIndex]}`,
         type: 'MEETING',
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+        startDate: eventStartIso,
+        endDate: eventEndIso,
         createdAt: now,
         updatedAt: now
       });
       
-      // Add a lecture for each day
-      const lectureStartDate = new Date(startDate);
-      lectureStartDate.setHours(13, 0, 0, 0); // 1 PM
+      // Add a lecture for each day at 1PM
+      const lectureHour = 13;
+      const lectureStartTimeStr = `${lectureHour.toString().padStart(2, '0')}:00:00.000Z`;
+      const lectureEndHour = lectureHour + 2;
+      const lectureEndTimeStr = `${lectureEndHour.toString().padStart(2, '0')}:00:00.000Z`;
       
-      const lectureEndDate = new Date(lectureStartDate);
-      lectureEndDate.setHours(lectureStartDate.getHours() + 2, 0, 0, 0); // 2-hour lectures
+      const lectureStartIso = `${dateStr}T${lectureStartTimeStr}`;
+      const lectureEndIso = `${dateStr}T${lectureEndTimeStr}`;
       
       testEvents.push({
         id: `lecture-test-${dayIndex}`,
         title: `COMP-${1000 + dayIndex}: Sample Lecture`,
         description: `Lecture for COMP-${1000 + dayIndex}`,
         type: 'OTHER',
-        startDate: lectureStartDate.toISOString(),
-        endDate: lectureEndDate.toISOString(),
+        startDate: lectureStartIso,
+        endDate: lectureEndIso,
         createdAt: now,
         updatedAt: now,
         isLecture: true
       });
       
-      // Add a lab for Monday, Wednesday, and Friday
+      // Add a lab for Monday, Wednesday, and Friday at 3:30PM
       if (dayIndex % 2 === 0) {
-        const labStartDate = new Date(startDate);
-        labStartDate.setHours(15, 30, 0, 0); // 3:30 PM
+        const labHour = 15;
+        const labMinute = 30;
+        const labStartTimeStr = `${labHour.toString().padStart(2, '0')}:${labMinute.toString().padStart(2, '0')}:00.000Z`;
+        const labEndHour = 17;
+        const labEndMinute = 0;
+        const labEndTimeStr = `${labEndHour.toString().padStart(2, '0')}:${labEndMinute.toString().padStart(2, '0')}:00.000Z`;
         
-        const labEndDate = new Date(labStartDate);
-        labEndDate.setHours(labStartDate.getHours() + 1, 30, 0, 0); // 1.5-hour labs
+        const labStartIso = `${dateStr}T${labStartTimeStr}`;
+        const labEndIso = `${dateStr}T${labEndTimeStr}`;
         
         testEvents.push({
           id: `lab-test-${dayIndex}`,
           title: `COMP-${1000 + dayIndex}: Lab Session`,
           description: `Lab for COMP-${1000 + dayIndex}`,
           type: 'OTHER',
-          startDate: labStartDate.toISOString(),
-          endDate: labEndDate.toISOString(),
+          startDate: labStartIso,
+          endDate: labEndIso,
           createdAt: now,
           updatedAt: now,
           isLab: true
@@ -463,7 +427,7 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
       }
     }
     
-    console.log('Created test events:', testEvents);
+    console.log('Created test events:', testEvents.length);
     setEvents(testEvents);
   };
 
@@ -487,8 +451,9 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
       setGeneratedStudySessions([]);
       
       // Fetch both regular events and accepted study sessions
-      const fetchedEvents = await fetchEvents(currentWeekStart);
-      const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, user.username || userId);
+      const currentUserId = user.username || userId;
+      const fetchedEvents = await fetchEvents(currentWeekStart, currentUserId);
+      const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, currentUserId);
       
       // Update hasAcceptedSessions state
       setHasAcceptedSessions(acceptedStudySessions.length > 0);
@@ -510,8 +475,8 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
 
   // Handle study session click for quiz
   const handleStudySessionClick = (event: ScheduleEvent) => {
-    if (event.isLecture) {
-      setSelectedStudySession(event);
+    if (event.isAcceptedStudySession) {
+      setSelectedLecture(event);
       setIsQuizModalOpen(true);
     }
   };
@@ -529,8 +494,8 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
       
       try {
         // Fetch events again to reflect any changes
-        const fetchedEvents = await fetchEvents(currentWeekStart);
-        const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, user.username || userId);
+        const fetchedEvents = await fetchEvents(currentWeekStart, user.username);
+        const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, user.username);
         
         // Combine them and update the state
         const combinedEvents = [...fetchedEvents, ...acceptedStudySessions];
@@ -590,11 +555,11 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
         </div>
       )}
       
-      {/* Study Session Quiz Modal */}
-      <QuizModal
+      {/* Lecture Quiz Modal */}
+      <LectureQuizModal
         isOpen={isQuizModalOpen}
         onClose={handleCloseQuizModal}
-        studySession={selectedStudySession}
+        lecture={selectedLecture}
         lectures={lectures}
         onProgressSaved={handleProgressSaved}
       />
