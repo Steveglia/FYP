@@ -139,16 +139,30 @@
   color: #333;
 }
 
+/* Schedule grid styles */
 .schedule-grid {
   display: flex;
   border: 1px solid #ddd;
   overflow-x: auto;
+  margin-bottom: 20px;
+  border-radius: 4px;
+  background-color: #fff;
+  width: 100%;
 }
 
-.time-column, .day-column {
+.time-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.day-column {
   display: flex;
   flex-direction: column;
   min-width: 100px;
+  flex: 1;
+  max-width: calc((100% - 60px) / 5); /* Evenly divide remaining space */
 }
 
 .header-cell {
@@ -163,64 +177,169 @@
 }
 
 .time-cell {
-  height: 46px;
+  height: 45px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-bottom: 1px solid #ddd;
   border-right: 1px solid #ddd;
   background-color: #f9f9f9;
+  font-size: 0.7rem;
+  color: #666;
 }
 
 .schedule-cell {
-  height: 46px;
+  height: 45px;
   border-bottom: 1px solid #ddd;
   border-right: 1px solid #ddd;
   position: relative;
+  padding: 1px;
+  overflow: visible;
+  box-sizing: border-box;
+  min-height: 45px;
 }
 
 /* Event item styles */
 .event-item {
-  font-size: 0.85rem;
-  line-height: 1.2;
-  word-break: break-word;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+  margin: 1px;
+  padding: 6px 8px; /* Increased horizontal padding */
+  border-radius: 4px;
+  font-size: 0.75rem; /* Slightly increased font size */
+  color: white;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   transition: all 0.3s cubic-bezier(.25,.8,.25,1);
-}
-
-.event-content {
+  position: absolute;
+  width: calc(100% - 2px); /* Ensure it spans almost the full width */
+  box-sizing: border-box;
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  width: 100%;
+  flex-direction: column; /* Stack content vertically by default */
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  left: 1px;
+  top: 1px;
+  right: 1px; /* Add right position to ensure proper width */
 }
 
-.progress-indicator {
-  display: inline-block;
-  margin-left: 4px;
-  font-size: 12px;
-  font-weight: bold;
-  color: #fff;
-  background-color: rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  width: 16px;
-  height: 16px;
-  line-height: 16px;
-  text-align: center;
-}
-
-.event-item.has-progress {
-  border-right: 3px solid #ffeb3b;
+/* Multi-hour events should have text vertically centered */
+.event-item[style*="height"] {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center; /* Ensure horizontal centering */
+  padding: 8px 10px; /* Increased padding for multi-hour events */
 }
 
 .event-item:hover {
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.16), 0 2px 4px rgba(0, 0, 0, 0.23);
+  transform: translateY(-1px);
 }
 
-/* Accepted study session style */
-.event-item.accepted-study {
-  background-color: #4caf50 !important;
-  color: white !important;
+/* Completed quiz styling */
+.event-item.completed-quiz {
+  border: 1px solid #27ae60;
+  box-shadow: 0 0 4px rgba(46, 204, 113, 0.3);
+}
+
+/* Completion indicator styling */
+.completion-indicator {
+  color: #2ecc71;
+  font-weight: bold;
+  font-size: 0.7rem;
+  display: inline-block;
+  background-color: rgba(255, 255, 255, 0.9);
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+  text-align: center;
+  border-radius: 50%;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+}
+
+/* Multi-hour events with more content can have an adjusted completion indicator */
+.event-item[style*="height:"]:not([style*="height: 42px"]) .completion-indicator {
+  top: 6px;
+  right: 6px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  font-size: 0.8rem;
+}
+
+/* Event content styles */
+.event-content {
+  display: flex;
+  flex-direction: column; /* Stack content vertically */
+  justify-content: center;
+  align-items: center; /* Center horizontally */
+  width: 100%;
+  font-weight: bold;
+  font-size: 0.75rem; /* Slightly increased font size */
+  overflow: hidden;
+  line-height: 1.2; /* Increased line height for better readability */
+  text-align: center;
+  padding: 0 6px; /* Increase padding for better readability */
+  max-width: calc(100% - 6px); /* Provide more space for content */
+}
+
+/* Default text style (no wrap, ellipsis) */
+.event-item .event-content {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Lecture and lab specific text style (wrap) */
+.event-item.lecture .event-content,
+.event-item.lab .event-content {
+  white-space: normal;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  max-height: 2.4em;
+  width: 94%; /* Give more width for the content */
+}
+
+/* Multi-hour lectures and labs can show more lines of text */
+.event-item[style*="height:"]:not([style*="height: 42px"]) .event-content {
+  -webkit-line-clamp: 4;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Center content horizontally */
+  justify-content: center; /* Center content vertically */
+  gap: 6px; /* Slightly increase gap between elements */
+  padding: 0 8px; /* Add more horizontal padding */
+  width: 90%; /* Set width to allow for some margin */
+}
+
+/* For extra tall events (3+ hours), allow even more text to be shown */
+.event-item[style*="height: 1"] .event-content,
+.event-item[style*="height: 2"] .event-content {
+  -webkit-line-clamp: 6;
+  width: 94%; /* Give even more space for very tall events */
+}
+
+/* Style for the course code in multi-hour events */
+.event-content span {
+  font-weight: bold;
+  margin-bottom: 4px; /* Add more space below the course code */
+  font-size: 0.8rem; /* Make course code slightly larger */
+}
+
+/* Style for the description in multi-hour events */
+.event-content div {
+  font-size: 0.75rem; /* Slightly larger font size */
+  font-weight: normal;
+  line-height: 1.2; /* Improved line height */
+  text-align: center; /* Ensure text is centered */
+  max-width: 95%; /* Ensure text doesn't get too close to edges */
 }
 
 /* Error message styles */
@@ -299,8 +418,98 @@
   cursor: not-allowed;
 }
 
+/* Tooltip styling */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  white-space: pre;
+  z-index: 100;
+  min-width: 200px;
+  max-width: 300px;
+  pointer-events: none;
+}
+
 /* Remove the old loading indicator */
-/* Loading indicator styles */
 .loading-indicator {
   display: none;
+}
+
+/* Study session specific styling */
+.event-item.study {
+  height: 30px !important;
+  margin-top: 8px;
+  font-size: 0.65rem;
+  opacity: 0.9;
+}
+
+/* Lecture and lab basic styling */
+.event-item.lecture,
+.event-item.lab {
+  font-weight: bold;
+  min-height: 42px !important;
+  padding: 6px 8px !important; /* Ensure consistent padding */
+}
+
+/* Lecture and lab padding for completion indicator */
+.event-item.completed-quiz .event-content {
+  padding-right: 16px; /* Increased padding to make room for completion indicator */
+}
+
+/* Multi-hour events for lectures and labs need special styling */
+.event-item.lecture[style*="height:9"], 
+.event-item.lab[style*="height:9"] {
+  /* Two-hour event (90px = 2*45px) */
+  border-radius: 5px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Make sure single-hour lecture and lab events have enough height */
+.event-item.lecture,
+.event-item.lab {
+  font-weight: bold;
+  min-height: 42px !important;
+  padding: 6px 8px !important; /* Ensure consistent padding */
+}
+
+/* Review session specific styling */
+.event-item.review {
+  background-color: #fd79a8 !important; /* Pink color for review sessions */
+  border: 1px solid #e84393;
+  font-weight: bold;
+  min-height: 42px !important;
+  padding: 6px 8px !important; /* Ensure consistent padding */
+}
+
+/* Review session title styling */
+.event-item.review .event-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 94%;
+}
+
+/* For the title "Review: COMP101" format */
+.event-item.review .event-content span {
+  font-weight: bold;
+  font-size: 0.8rem;
+  margin-bottom: 2px;
+}
+
+.event-item.lab {
+  font-weight: bold;
+  min-height: 42px !important;
+  padding: 6px 8px !important; /* Ensure consistent padding */
 } 

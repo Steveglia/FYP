@@ -5,18 +5,22 @@ export type BaseEvent = Schema["CalendarEvent"]["type"];
 export type Lecture = Schema["Lectures"]["type"];
 
 // Extended event type with additional properties
-export interface Event extends BaseEvent {
+export interface Event extends Omit<BaseEvent, 'type'> {
   isLecture?: boolean;
   isLab?: boolean;
   userId?: string;
+  type?: 'WORK' | 'STUDY' | 'MEETING' | 'OTHER' | 'LECTURE' | 'LAB' | null;
 }
 
 export interface ScheduleEvent extends Event {
   isStart?: boolean;
   isAcceptedStudySession?: boolean;
+  duration?: number; // Duration in hours
+  lectureId?: string; // Associated lecture ID
+  courseId?: string; // Associated course ID
 }
 
-// Event type definitions
+// Event type definitions for our application
 export type EventType = 'WORK' | 'STUDY' | 'MEETING' | 'OTHER' | 'LECTURE' | 'LAB';
 
 // Color mapping for different event types
@@ -33,3 +37,20 @@ export const eventTypeColors = {
 // Constants for schedule
 export const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 export const hours = Array.from({ length: 15 }, (_, i) => i + 8); // 8 AM to 10 PM 
+
+// Utility function to safely convert event type
+export function ensureValidEventType(type: string | null | undefined): EventType {
+  if (!type) return 'OTHER';
+  
+  // Check if the type is one of the valid EventType values
+  if (type === 'WORK' || 
+      type === 'STUDY' || 
+      type === 'MEETING' || 
+      type === 'OTHER' || 
+      type === 'LECTURE' || 
+      type === 'LAB') {
+    return type;
+  }
+  
+  return 'OTHER';
+} 

@@ -55,7 +55,16 @@ const schema = a
       })
       .authorization(allow => [allow.publicApiKey()]),
       
-      StudyPreference: a
+    PersonalLearning: a
+      .model({
+        userId: a.string().required(),
+        subject: a.string().required(),
+        totalRequiredHours: a.integer().required(),
+        weeklyDedicationHours: a.integer().required(),
+      })
+      .authorization(allow => [allow.publicApiKey()]),
+      
+    StudyPreference: a
       .model({
         studyTime: a.string(),
         maxHoursPerDay: a.integer(),

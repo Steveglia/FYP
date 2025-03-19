@@ -23,6 +23,11 @@ const Home = () => {
           <h2>Courses</h2>
           <p>Manage your enrolled courses and course materials</p>
         </Link>
+        
+        <Link to="/personal-learning" className="menu-item">
+          <h2>Personal Learning</h2>
+          <p>Track your own subjects with dedicated study hours</p>
+        </Link>
       </div>
       
       <div className="features-section">
@@ -31,6 +36,7 @@ const Home = () => {
           <li><strong>Weekly Schedule:</strong> View and manage your academic timetable</li>
           <li><strong>Smart Study Planning:</strong> AI-optimized study session recommendations</li>
           <li><strong>Course Management:</strong> Track progress across different courses</li>
+          <li><strong>Personal Learning:</strong> Set goals for self-directed learning topics</li>
           <li><strong>Spaced Repetition:</strong> Based on scientifically-proven learning techniques</li>
         </ul>
       </div>

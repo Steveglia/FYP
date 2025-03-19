@@ -12,8 +12,7 @@ interface LectureQuizModalProps {
   isOpen: boolean;
   onClose: () => void;
   lecture: ScheduleEvent | null;
-  lectures: Event[];
-  onProgressSaved?: () => void;
+  onProgressSaved?: (lectureId: string) => void;
 }
 
 interface ProgressData {
@@ -25,7 +24,6 @@ const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
   isOpen,
   onClose,
   lecture,
-  lectures,
   onProgressSaved
 }) => {
   const { user } = useAuthenticator();
@@ -33,71 +31,59 @@ const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [progress, setProgress] = useState<Record<string, ProgressData>>({});
+  const [lectureScores, setLectureScores] = useState<Record<string, number>>({});
   
   // Load user progress data when modal opens
   useEffect(() => {
     if (isOpen && lecture) {
-      // Add a test to validate that we can access the database
-      const testDatabaseAccess = async () => {
-        try {
-          console.log("Testing database access...");
-          console.log("Current user from hook:", user);
-          
-          const modelList = await client.models;
-          console.log("Available models:", Object.keys(modelList));
-          
-          // Try a simple list operation
-          const testQuery = await client.models.UserProgress.list({
-            limit: 1
-          });
-          console.log("Test query result:", testQuery);
-          
-          console.log("Database access test completed");
-        } catch (error) {
-          console.error("Database access test failed:", error);
-        }
-      };
-      
-      testDatabaseAccess();
-      
       setScore(0);
       setErrorMessage(null);
-      
-      // Load existing progress data when modal opens
       loadUserProgress();
     }
   }, [isOpen, lecture, user]);
   
-  // Load user progress data for all courses
+  // Load user progress data for all courses and lectures
   const loadUserProgress = async () => {
-    if (!user?.username) return;
+    if (!user?.username || !lecture?.id) return;
     
     try {
+      // Get all progress records for this user
       const userProgress = await client.models.UserProgress.list({
         filter: { userId: { eq: user.username } }
       });
       
       if (userProgress.data && userProgress.data.length > 0) {
         const progressByLecture: Record<string, ProgressData> = {};
+        const scoresByLectureId: Record<string, number> = {};
         
+        // Process all progress records
         userProgress.data.forEach(record => {
+          // Store course-level progress
           if (record.courseId) {
             progressByLecture[record.courseId] = {
               completedLectures: record.completedLectures?.filter((item): item is string => item !== null) || [],
               quizScore: record.quizScores || 0
             };
           }
+          
+          // Store lecture-specific scores
+          if (record.lectureId) {
+            scoresByLectureId[record.lectureId] = record.quizScores || 0;
+          }
         });
         
         setProgress(progressByLecture);
-        console.log('Loaded user progress:', progressByLecture);
+        setLectureScores(scoresByLectureId);
         
-        // Pre-fill with existing score if available
-        if (lecture) {
+        // Pre-fill with existing score if available for this specific lecture
+        const lectureId = lecture.id;
+        if (scoresByLectureId[lectureId]) {
+          setScore(scoresByLectureId[lectureId]);
+        } else {
+          // Fallback to course score if no lecture-specific score
           const courseId = lecture.title?.split(':')[0]?.trim() || '';
           if (progressByLecture[courseId] && progressByLecture[courseId].quizScore > 0) {
             setScore(progressByLecture[courseId].quizScore);
-            console.log('Pre-filled score:', progressByLecture[courseId].quizScore);
           }
         }
       }
@@ -109,10 +95,6 @@ const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
   const handleSaveProgress = async () => {
     if (!lecture || !user?.username) {
       setErrorMessage("Missing required information to save progress");
-      console.error("Save failed - missing data:", { 
-        lecture, 
-        userId: user?.username 
-      });
       return;
     }
     
@@ -122,97 +104,90 @@ const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
     try {
       const courseId = lecture.title?.split(':')[0]?.trim() || 'UNKNOWN';
       const lectureId = lecture.id || '';
-      const now = new Date().toISOString();
+      const now = new Date();
+      const nowISOString = now.toISOString();
       
-      console.log("Attempting to save progress with:", {
-        userId: user.username,
-        courseId,
-        lectureId, 
-        score,
-        timestamp: now
-      });
-      
-      // Check if there's an existing progress record for this user and course
-      const existingProgress = await client.models.UserProgress.list({
+      // First, check if there's an existing progress record for this specific lecture
+      const existingLectureProgress = await client.models.UserProgress.list({
         filter: {
           and: [
             { userId: { eq: user.username } },
-            { courseId: { eq: courseId } },
+            { lectureId: { eq: lectureId } },
           ]
         }
       });
       
-      console.log("Existing progress query result:", existingProgress);
-      
       // Save the quiz score progress
       let savedSuccessfully = false;
+      let isFirstSubmission = false;
       
-      if (existingProgress.data && existingProgress.data.length > 0) {
-        // Update existing progress record
-        const progressRecord = existingProgress.data[0];
-        console.log("Found existing progress record:", progressRecord);
+      if (existingLectureProgress.data && existingLectureProgress.data.length > 0) {
+        // Update existing lecture-specific progress record
+        const progressRecord = existingLectureProgress.data[0];
         
-        // Update completedLectures array if lecture not already marked as completed
-        let completedLectures = progressRecord.completedLectures || [];
-        if (!completedLectures.includes(lectureId)) {
-          completedLectures = [...completedLectures, lectureId];
+        // Check if this is essentially a first submission (no previous valid score)
+        if (progressRecord.quizScores === null || progressRecord.quizScores === undefined) {
+          isFirstSubmission = true;
         }
         
-        console.log("Updating progress record with:", {
-          id: progressRecord.id,
-          quizScores: score,
-          completedLectures,
-          lastAccessed: now
-        });
-        
+        // Update the quiz score
         try {
           const updateResult = await client.models.UserProgress.update({
             id: progressRecord.id,
             quizScores: score,
-            completedLectures,
-            lastAccessed: now
+            lastAccessed: nowISOString
           });
-          
-          console.log("Update result:", updateResult);
           
           if (updateResult.errors) {
             throw new Error(`Failed to update: ${JSON.stringify(updateResult.errors)}`);
           }
           
-          console.log(`Updated progress for user ${user.username}, course ${courseId}, lecture ${lectureId} with score ${score}%`);
           savedSuccessfully = true;
         } catch (updateError) {
-          console.error("Error during update operation:", updateError);
           throw updateError;
         }
       } else {
-        // Create new progress record
-        console.log("No existing progress found, creating new record");
+        // Creating a new progress record - definitely a first submission
+        isFirstSubmission = true;
+        
+        // Also check if we have a course-level progress record
+        const existingCourseProgress = await client.models.UserProgress.list({
+          filter: {
+            and: [
+              { userId: { eq: user.username } },
+              { courseId: { eq: courseId } },
+            ]
+          }
+        });
+        
+        // If there's an existing course record, make sure to maintain the completedLectures
+        let completedLectures: string[] = [lectureId];
+        if (existingCourseProgress.data && existingCourseProgress.data.length > 0) {
+          const courseRecord = existingCourseProgress.data[0];
+          completedLectures = [
+            ...(courseRecord.completedLectures || []).filter((id): id is string => !!id && id !== lectureId),
+            lectureId
+          ];
+        }
         
         const newProgressData = {
           userId: user.username,
           courseId: courseId,
           lectureId: lectureId,
-          completedLectures: [lectureId],
+          completedLectures: completedLectures,
           quizScores: score,
-          lastAccessed: now
+          lastAccessed: nowISOString
         };
-        
-        console.log("Creating new progress with:", newProgressData);
         
         try {
           const createResult = await client.models.UserProgress.create(newProgressData);
-          
-          console.log("Create result:", createResult);
           
           if (createResult.errors) {
             throw new Error(`Failed to create: ${JSON.stringify(createResult.errors)}`);
           }
           
-          console.log(`Created new progress record for user ${user.username}, course ${courseId}, lecture ${lectureId} with score ${score}%`);
           savedSuccessfully = true;
         } catch (createError) {
-          console.error("Error during create operation:", createError);
           throw createError;
         }
       }
@@ -220,85 +195,79 @@ const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
       // Calculate and schedule next review session using Half-Life Regression
       if (savedSuccessfully) {
         try {
-          console.log('Scheduling next review session using HLR...');
-          
-          // Get study count by checking existing reviews
-          let studyCount = 1;
-          
-          // Check for existing scheduled reviews to get the study count
-          try {
-            const existingReviews = await client.models.ScheduledReviews.list({
-              filter: {
-                and: [
-                  { userId: { eq: user.username } },
-                  { lectureId: { eq: lectureId } }
-                ]
-              }
-            });
-            
-            if (existingReviews.data && existingReviews.data.length > 0) {
-              const review = existingReviews.data[0];
-              studyCount = (review.studyCount || 1) + 1;
+          // Check if there's already a scheduled review for this lecture
+          const existingReviews = await client.models.ScheduledReviews.list({
+            filter: {
+              and: [
+                { userId: { eq: user.username } },
+                { lectureId: { eq: lectureId } }
+              ]
             }
-          } catch (reviewError) {
-            console.error("Error fetching existing reviews:", reviewError);
-          }
+          });
           
-          // Use the lecture date as the quiz completion time 
-          const quizCompletionTime = lecture?.startDate ? new Date(lecture.startDate) : new Date(now);
+          // Whether we need to create a new review schedule
+          const shouldCreateReview = isFirstSubmission || existingReviews.data.length === 0;
           
-          console.log(`Quiz completion time: ${quizCompletionTime.toLocaleString()} (based on lecture date)`);
-          
-          // Save the review using the enhanced HLR service with the actual quiz completion time
-          const reviewScheduled = await hlrService.saveScheduledReview(
-            user.username,
-            courseId,
-            lectureId,
-            score,
-            studyCount,
-            quizCompletionTime
-          );
-          
-          if (reviewScheduled) {
-            console.log(`Successfully scheduled next review session for lecture ${lectureId} based on quiz taken at ${quizCompletionTime.toLocaleString()}`);
-          } else {
-            console.warn('Failed to schedule next review session');
+          if (shouldCreateReview) {
+            // For first submission, start with study count of 1
+            let studyCount = 1;
+            
+            // Use the lecture date as the quiz completion time if available, otherwise use now
+            const quizCompletionTime = lecture?.startDate ? new Date(lecture.startDate) : now;
+            
+            // Save the review using the enhanced HLR service with the actual quiz completion time
+            const reviewScheduled = await hlrService.saveScheduledReview(
+              user.username,
+              courseId,
+              lectureId,
+              score,
+              studyCount,
+              quizCompletionTime
+            );
+            
+            if (!reviewScheduled) {
+              throw new Error('Failed to schedule review session');
+            }
           }
         } catch (schedulingError) {
-          console.error("Error scheduling next review:", schedulingError);
-          // Don't throw error here - we still want to show success for saving the progress
+          setErrorMessage(`Saved progress but failed to schedule review: ${schedulingError instanceof Error ? schedulingError.message : 'Unknown error'}`);
         }
       }
       
       // Refresh progress data
       await loadUserProgress();
       
-      // Notify parent component
-      if (onProgressSaved) {
-        onProgressSaved();
-      }
-      
-      // Show confirmation with next review date information
-      const scheduledReviews = await client.models.ScheduledReviews.list({
-        filter: {
-          and: [
-            { userId: { eq: user.username } },
-            { lectureId: { eq: lectureId } }
-          ]
+      // Only proceed with success steps if there wasn't an error message set above
+      if (!errorMessage) {
+        // Notify parent component
+        if (onProgressSaved && lectureId) {
+          onProgressSaved(lectureId);
         }
-      });
-      
-      let confirmationMessage = `Progress saved! Score: ${score}% for ${lecture.title}`;
-      
-      if (scheduledReviews.data && scheduledReviews.data.length > 0) {
-        const nextReview = new Date(scheduledReviews.data[0].reviewDate);
-        confirmationMessage += `\n\nNext recommended review: ${nextReview.toLocaleDateString()} at ${nextReview.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        
+        // Show confirmation with next review date information
+        const scheduledReviews = await client.models.ScheduledReviews.list({
+          filter: {
+            and: [
+              { userId: { eq: user.username } },
+              { lectureId: { eq: lectureId } }
+            ]
+          }
+        });
+        
+        let confirmationMessage = `Progress saved! Score: ${score}% for ${lecture.title}`;
+        
+        if (scheduledReviews.data && scheduledReviews.data.length > 0) {
+          const nextReview = new Date(scheduledReviews.data[0].reviewDate);
+          confirmationMessage += `\n\nNext recommended review: ${nextReview.toLocaleDateString()} at ${nextReview.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        } else {
+          confirmationMessage += `\n\nWarning: No upcoming review was scheduled. Please contact support.`;
+        }
+        
+        alert(confirmationMessage);
+        
+        // Close the modal after saving
+        onClose();
       }
-      
-      alert(confirmationMessage);
-      
-      // Close the modal after saving
-      onClose();
     } catch (error) {
       console.error('Error saving progress:', error);
       setErrorMessage(`Failed to save progress: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -313,7 +282,6 @@ const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
     try {
       return new Date(dateStr).toLocaleDateString();
     } catch (e) {
-      console.error('Invalid date:', dateStr);
       return '';
     }
   };
@@ -324,7 +292,6 @@ const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
     try {
       return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } catch (e) {
-      console.error('Invalid date:', dateStr);
       return '';
     }
   };
@@ -338,72 +305,59 @@ const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
   if (!isOpen || !lecture) return null;
   
   return (
-    <div className="quiz-modal-overlay">
-      <div className="quiz-modal-content">
-        <div className="quiz-modal-header">
-          <h2>Quiz for Lecture</h2>
-          <button className="close-btn" onClick={onClose}>&times;</button>
-        </div>
+    <div className={`modal ${isOpen ? 'open' : ''}`}>
+      <div className="modal-content">
+        <span className="close-button" onClick={onClose}>&times;</span>
         
-        <div className="quiz-modal-body">
+        <h2>Quiz Score for Lecture</h2>
+        
+        {lecture && (
           <div className="lecture-details">
-            <h3>{lecture.title || 'Untitled Lecture'}</h3>
-            {lecture.description && <p>{lecture.description}</p>}
-            <p className="lecture-metadata">
-              {lecture.startDate && (
-                <span>Date: {formatDate(lecture.startDate)} at {formatTime(lecture.startDate)}</span>
-              )}
-            </p>
-          </div>
-          
-          <div className="score-input-container">
-            <label htmlFor="quiz-score">Enter your quiz score (0-100%):</label>
-            <div className="score-input-wrapper">
-              <input
-                id="quiz-score"
-                type="number"
-                className="score-input"
-                value={score}
-                onChange={handleScoreChange}
-                min="0"
-                max="100"
-              />
-              <span className="percentage-sign">%</span>
-            </div>
-            <div className="score-slider-container">
-              <input
-                type="range"
-                className="score-slider"
-                min="0"
-                max="100"
-                value={score}
-                onChange={handleScoreChange}
-              />
-              <div className="score-labels">
-                <span>0%</span>
-                <span>50%</span>
-                <span>100%</span>
+            <p><strong>Title:</strong> {lecture.title}</p>
+            <p><strong>Date:</strong> {formatDate(lecture.startDate)} at {formatTime(lecture.startDate)}</p>
+            {lecture.description && <p><strong>Description:</strong> {lecture.description}</p>}
+            {lecture.location && <p><strong>Location:</strong> {lecture.location}</p>}
+            
+            {/* Show previous score if it exists */}
+            {lecture.id && lectureScores[lecture.id] > 0 && (
+              <div className="previous-score-alert">
+                <p>You previously submitted a score of <strong>{lectureScores[lecture.id]}%</strong> for this lecture.</p>
+                <p>You can update your score below if needed.</p>
               </div>
+            )}
+            
+            <div className="quiz-score-input">
+              <label htmlFor="quiz-score">
+                Enter your quiz score (0-100%) for this specific lecture:
+              </label>
+              <input
+                type="number"
+                id="quiz-score"
+                min="0"
+                max="100"
+                value={score}
+                onChange={handleScoreChange}
+              />
+            </div>
+            
+            {errorMessage && (
+              <div className="error-message">
+                {errorMessage}
+              </div>
+            )}
+            
+            <div className="button-container">
+              <button
+                className="submit-button"
+                onClick={handleSaveProgress}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Saving...' : lecture.id && lectureScores[lecture.id] > 0 ? 'Update Score' : 'Save Score'}
+              </button>
+              <button className="cancel-button" onClick={onClose}>Cancel</button>
             </div>
           </div>
-          
-          {errorMessage && (
-            <div className="error-message">
-              {errorMessage}
-            </div>
-          )}
-        </div>
-        
-        <div className="quiz-modal-footer">
-          <button className="cancel-btn" onClick={onClose}>Cancel</button>
-          <button
-            className="start-quiz-btn"
-            onClick={handleSaveProgress}
-            disabled={isLoading}
-          >
-            {isLoading ? 'Saving...' : 'Save Score'}
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );

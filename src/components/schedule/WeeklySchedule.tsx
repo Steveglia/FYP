@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useAuthenticator } from '@aws-amplify/ui-react';
-import { Event, ScheduleEvent, weekDays, hours } from './types';
+import { Event, ScheduleEvent, weekDays, hours, ensureValidEventType } from './types';
 import { getMondayOfCurrentWeek } from './utils';
 import { 
   fetchEvents, 
@@ -54,6 +54,9 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
   // Add state for selected study session for quiz
   const [selectedLecture, setSelectedLecture] = useState<ScheduleEvent | null>(null);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
+  
+  // Add a new state variable for recently completed lectures
+  const [recentlyCompletedLectures, setRecentlyCompletedLectures] = useState<string[]>([]);
   
   // Initialize with initial events
   useEffect(() => {
@@ -181,8 +184,7 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
           // Ensure end date is after start date
           if (endDateStr === startDateStr && (endHour < startHour || (endHour === startHour && endMinute <= startMinute))) {
             console.error(`Event "${event.title}" has invalid time range (end <= start)`);
-            // In this case, set end hour to startHour + 1
-            const newEndHour = startHour + 1;
+            // In this case, we would need to adjust the end time but we're just logging the error
           }
 
           // Only process events within the current week
@@ -219,14 +221,25 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
               if (hour >= 8 && schedule[day] && schedule[day][hour]) {
                 // Check if this is an accepted study session
                 const isAcceptedStudySession = 
-                  event.type === 'STUDY' && 
+                  ensureValidEventType(event.type) === 'STUDY' && 
                   !generatedStudySessions.some(s => s.id === event.id);
+                
+                // Only mark the first hour as the start hour
+                const isStartHour = hour === startHour;
+                
+                // Calculate and store event duration in hours
+                const durationHours = event.startDate && event.endDate 
+                  ? (new Date(event.endDate).getTime() - new Date(event.startDate).getTime()) / (1000 * 60 * 60)
+                  : 1;
                 
                 const scheduleEvent: ScheduleEvent = {
                   ...event,
-                  isStart: hour === startHour,
+                  isStart: isStartHour,
+                  duration: durationHours, // Store duration for better rendering
                   isAcceptedStudySession
                 };
+                
+                // Add the event to this hour's cell
                 schedule[day][hour].push(scheduleEvent);
               }
             }
@@ -473,9 +486,9 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
     }
   };
 
-  // Handle study session click for quiz
-  const handleStudySessionClick = (event: ScheduleEvent) => {
-    if (event.isAcceptedStudySession) {
+  // Handle lecture click for quiz submission
+  const handleEventClick = (event: ScheduleEvent) => {
+    if (event.isLecture) {
       setSelectedLecture(event);
       setIsQuizModalOpen(true);
     }
@@ -487,7 +500,15 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
   };
   
   // Handle progress saved in the quiz modal
-  const handleProgressSaved = () => {
+  const handleProgressSaved = (lectureId?: string) => {
+    // If we have a lectureId from the callback, add it to the recentlyCompletedLectures
+    // If not, fall back to selectedLecture?.id for backward compatibility
+    if (lectureId) {
+      setRecentlyCompletedLectures(prevState => [...prevState, lectureId]);
+    } else if (selectedLecture?.id) {
+      setRecentlyCompletedLectures(prevState => [...prevState, selectedLecture.id as string]);
+    }
+    
     // Refresh data after progress is saved
     const fetchUpdatedData = async () => {
       if (!user) return;
@@ -539,7 +560,8 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
       
       <ScheduleGrid 
         eventsByDayAndTime={eventsByDayAndTime} 
-        onEventClick={handleStudySessionClick}
+        onEventClick={handleEventClick}
+        recentlyCompletedLectures={recentlyCompletedLectures}
       />
       <ScheduleLegend />
       
@@ -560,7 +582,6 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
         isOpen={isQuizModalOpen}
         onClose={handleCloseQuizModal}
         lecture={selectedLecture}
-        lectures={lectures}
         onProgressSaved={handleProgressSaved}
       />
     </div>

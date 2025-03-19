@@ -8,7 +8,9 @@ import Navigation from './components/Navigation';
 import Home from './pages/Home';
 import Schedule from './pages/Schedule';
 import Preferences from './pages/Preferences';
+import ReviewSessions from './pages/ReviewSessions';
 import CourseSelection from './components/CourseSelection';
+import PersonalLearning from './components/PersonalLearning';
 import './App.css';
 import './components/CourseSelection.css';
 
@@ -112,8 +114,10 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/schedule" element={<Schedule />} />
+          <Route path="/reviews" element={<ReviewSessions />} />
           <Route path="/preferences" element={<Preferences />} />
           <Route path="/courses" element={<CourseSelection onCoursesChange={handleCoursesChange} />} />
+          <Route path="/personal-learning" element={<PersonalLearning />} />
         </Routes>
       </main>
     </div>

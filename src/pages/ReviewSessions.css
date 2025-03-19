@@ -1,0 +1,128 @@
+.review-sessions-page {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.reviews-header {
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.reviews-header h1 {
+  font-size: 28px;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.page-description {
+  color: #666;
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.refresh-button-container {
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.refresh-button {
+  background-color: #f8f9fa;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  padding: 8px 12px;
+  color: #495057;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.refresh-button:hover {
+  background-color: #e9ecef;
+  color: #212529;
+}
+
+.review-tabs {
+  display: flex;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #ddd;
+}
+
+.tab-button {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.2s;
+}
+
+.tab-button:hover {
+  color: #333;
+}
+
+.tab-button.active {
+  color: #3498db;
+  border-bottom-color: #3498db;
+}
+
+.loading-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  font-size: 18px;
+  color: #666;
+}
+
+.error-message {
+  padding: 20px;
+  background-color: #feeaeb;
+  color: #e74c3c;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.no-reviews-message {
+  padding: 40px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  text-align: center;
+  color: #6c757d;
+}
+
+.no-reviews-message p {
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+/* Card Grid Layout */
+.reviews-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 25px;
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #fafafa;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .reviews-card-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .refresh-button-container {
+    position: static;
+    margin-top: 16px;
+    display: flex;
+    justify-content: flex-end;
+  }
+} 

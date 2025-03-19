@@ -1,4 +1,4 @@
-import { Event, ScheduleEvent, eventTypeColors } from './types';
+import { Event, ScheduleEvent, eventTypeColors, ensureValidEventType } from './types';
 
 // Function to calculate event height based on start and end dates
 export const calculateEventHeight = (event: ScheduleEvent): string => {
@@ -39,8 +39,9 @@ export const getEventColor = (event: ScheduleEvent): string => {
     return eventTypeColors.LECTURE;
   }
   
-  // Otherwise use the regular type-based coloring
-  return eventTypeColors[event.type as keyof typeof eventTypeColors] || eventTypeColors.default;
+  // Otherwise use the regular type-based coloring with safe conversion
+  const eventType = ensureValidEventType(event.type) as keyof typeof eventTypeColors;
+  return eventTypeColors[eventType] || eventTypeColors.default;
 };
 
 // Helper function to get Monday of the current week or of a provided date

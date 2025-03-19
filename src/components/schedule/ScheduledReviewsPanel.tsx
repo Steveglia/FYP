@@ -18,6 +18,7 @@ interface ScheduledReview {
   halfLife: number;
   studyCount: number;
   lastReviewDate: string;
+  isCompleted?: boolean;
 }
 
 interface LectureInfo {
@@ -55,20 +56,58 @@ const ScheduledReviewsPanel: React.FC<ScheduledReviewsProps> = ({ userId }) => {
       });
       
       if (response.data && response.data.length > 0) {
-        // Filter for upcoming reviews
-        const now = new Date();
+        // Get all user progress records to check which reviews have quiz scores
+        const progressRecords = await client.models.UserProgress.list({
+          filter: { userId: { eq: userId } }
+        });
+        
+        // Create a map of lectureId to their latest quiz score submission times
+        const lectureProgressMap: Record<string, { hasSubmitted: boolean, submissionTime: Date }> = {};
+        
+        if (progressRecords.data) {
+          progressRecords.data.forEach(record => {
+            if (record.lectureId && record.lastAccessed) {
+              // Check if this is a newer submission than any existing one
+              const currentSubmission = new Date(record.lastAccessed);
+              const existingRecord = lectureProgressMap[record.lectureId];
+              
+              if (!existingRecord || currentSubmission > existingRecord.submissionTime) {
+                lectureProgressMap[record.lectureId] = {
+                  hasSubmitted: (record.quizScores !== null && record.quizScores !== undefined),
+                  submissionTime: currentSubmission
+                };
+              }
+            }
+          });
+        }
+        
+        // Transform review data and filter out completed reviews
         const upcoming = response.data
-          .filter(review => new Date(review.reviewDate) >= now)
-          .map(review => ({
-            id: review.id,
-            courseId: review.courseId,
-            lectureId: review.lectureId,
-            reviewDate: review.reviewDate,
-            lastScore: review.lastScore || 0,
-            halfLife: review.halfLife,
-            studyCount: review.studyCount || 1,
-            lastReviewDate: review.lastReviewDate || now.toISOString()
-          }))
+          .map(review => {
+            // A review is considered "completed" if:
+            // 1. There's a progress record for this lecture
+            // 2. AND the submission time is AFTER the scheduled review date
+            const reviewDate = new Date(review.reviewDate);
+            const progress = lectureProgressMap[review.lectureId];
+            
+            const isCompleted = progress && 
+                              progress.hasSubmitted && 
+                              progress.submissionTime > reviewDate;
+                              
+            return {
+              id: review.id,
+              courseId: review.courseId,
+              lectureId: review.lectureId,
+              reviewDate: review.reviewDate,
+              lastScore: review.lastScore || 0,
+              halfLife: review.halfLife,
+              studyCount: review.studyCount || 1,
+              lastReviewDate: review.lastReviewDate || new Date().toISOString(),
+              isCompleted
+            };
+          })
+          // Show all reviews, including completed ones
+          // .filter(review => !review.isCompleted)
           .sort((a, b) => new Date(a.reviewDate).getTime() - new Date(b.reviewDate).getTime());
         
         setUpcomingReviews(upcoming);
@@ -76,7 +115,8 @@ const ScheduledReviewsPanel: React.FC<ScheduledReviewsProps> = ({ userId }) => {
         // Fetch lecture info for these reviews
         const lectureIds = [...new Set(upcoming.map(review => review.lectureId))];
         if (lectureIds.length > 0) {
-          fetchLectureInfo(lectureIds);
+          // Wait for lecture info to be fetched before setting loading to false
+          await fetchLectureInfo(lectureIds);
         }
       } else {
         // If no data is found, set an empty array
@@ -86,6 +126,7 @@ const ScheduledReviewsPanel: React.FC<ScheduledReviewsProps> = ({ userId }) => {
       console.error('Error fetching scheduled reviews:', err);
       setError('Failed to load your scheduled reviews. Please try again later.');
     } finally {
+      // Only complete loading once everything is done
       setIsLoading(false);
     }
   };
@@ -140,6 +181,7 @@ const ScheduledReviewsPanel: React.FC<ScheduledReviewsProps> = ({ userId }) => {
       }
       
       setLectures(lectureInfo);
+      console.log('Lecture information loaded:', Object.keys(lectureInfo).length, 'lectures');
     } catch (err) {
       console.error('Error fetching lecture information:', err);
     }

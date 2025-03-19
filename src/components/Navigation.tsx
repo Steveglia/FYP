@@ -17,6 +17,9 @@ const Navigation = () => {
         <Link to="/schedule" className={location.pathname === '/schedule' ? 'active' : ''}>
           Weekly Schedule
         </Link>
+        <Link to="/reviews" className={location.pathname === '/reviews' ? 'active' : ''}>
+          Review Sessions
+        </Link>
         <Link to="/preferences" className={location.pathname === '/preferences' ? 'active' : ''}>
           Preferences
         </Link>
@@ -25,6 +28,12 @@ const Navigation = () => {
           className={({ isActive }) => isActive ? 'active' : ''}
         >
           Courses
+        </NavLink>
+        <NavLink 
+          to="/personal-learning" 
+          className={({ isActive }) => isActive ? 'active' : ''}
+        >
+          Personal Learning
         </NavLink>
       </div>
       <button onClick={signOut} className="sign-out-btn">Sign out</button>
