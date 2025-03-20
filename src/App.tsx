@@ -84,24 +84,6 @@ function App() {
     }
   }, [user, preferencesInitialized]);
 
-  useEffect(() => {
-    // Check if file exists
-    fetch('app.css')
-      .then(() => {
-        // File exists
-      })
-      .catch(() => {
-        // File doesn't exist
-        fetch('create-app-css', {
-          method: 'POST'
-        }).then(() => {
-          // File created
-        }).catch(() => {
-          // Error creating file
-        });
-      });
-  }, []);
-
   const handleCoursesChange = (selectedCourses: string[]) => {
     console.log('Selected courses:', selectedCourses);
     // You can handle the selected courses here, e.g., save to state or send to an API
