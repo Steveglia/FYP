@@ -15,11 +15,6 @@ interface LectureQuizModalProps {
   onProgressSaved?: (lectureId: string) => void;
 }
 
-interface ProgressData {
-  completedLectures: string[];
-  quizScore: number;
-}
-
 const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
   isOpen,
   onClose,
@@ -70,7 +65,6 @@ const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
           setScore(scoresByLectureId[lectureId]);
         } else {
           // Fallback to course score if no lecture-specific score
-          const courseId = lecture.title?.split(':')[0]?.trim() || '';
           // Assuming progressByLecture is not used in this function
         }
       }
