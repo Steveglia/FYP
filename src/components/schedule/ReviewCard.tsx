@@ -139,7 +139,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, lectureInfo, onReviewCo
       // 2. Mark the current review as completed
       try {
         // Get the current review to update
-        const existingReviews = await client.models.ScheduledReviews.list({
+        await client.models.ScheduledReviews.list({
           filter: {
             userId: { eq: userId },
             lectureId: { eq: review.lectureId }

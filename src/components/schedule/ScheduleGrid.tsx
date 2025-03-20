@@ -263,9 +263,6 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     return eventTypeColors[eventType] || eventTypeColors.default;
   };
 
-  // List of days to display in the grid
-  const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-
   // Simplify the processedSchedule useMemo
   const processedSchedule = useMemo(() => {
     return JSON.parse(JSON.stringify(eventsByDayAndTime));
@@ -289,7 +286,7 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
               {processedSchedule && processedSchedule[day] && processedSchedule[day][hour] 
                 ? processedSchedule[day][hour]
                   .filter((event: ScheduleEvent) => event.isStart === true)
-                  .map((event: ScheduleEvent, index: number) => {
+                  .map((event: ScheduleEvent) => {
                     const isLecture = event.isLecture;
                     const hasCompleted = isLecture && hasQuizScore(event);
                     

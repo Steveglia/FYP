@@ -91,7 +91,7 @@ export const fetchAcceptedStudySessions = async (weekStartDate: Date, userId: st
 };
 
 // Fetch events for the current week
-export const fetchEvents = async (currentWeekStart: Date, userId: string): Promise<Event[]> => {
+export const fetchEvents = async (currentWeekStart: Date): Promise<Event[]> => {
   try {
     // Calculate week end date
     const weekEndDate = new Date(currentWeekStart);
@@ -108,8 +108,6 @@ export const fetchEvents = async (currentWeekStart: Date, userId: string): Promi
           { startDate: { ge: startDateStr } },
           { startDate: { lt: endDateStr } }
           // userId is intentionally not used in the filter yet
-          // We'll add it back once we confirm events are showing properly
-          // { userId: { eq: userId } }
         ]
       }
     });
@@ -311,14 +309,6 @@ export const generateStudySessions = async (
     // Create initial availability vector (all available)
     const availabilityVector = new Array(105).fill(1);
     
-    // Create a day/hour map for better logging
-    const slotToString = (index: number) => {
-      const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      const dayIndex = Math.floor(index / 15);
-      const hourIndex = (index % 15) + 8;
-      return `${weekDays[dayIndex]} ${hourIndex}:00-${hourIndex+1}:00`;
-    };
-    
     // Log the vector in a readable format for each day
     const logVectorByDay = (vector: number[]) => {
       const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -332,7 +322,7 @@ export const generateStudySessions = async (
     const slotModifications: Record<number, string[]> = {};
     
     // Mark unavailable times based on events and lectures from database
-    allEvents.forEach((event, eventIndex) => {
+    allEvents.forEach((event) => {
       if (event.startDate && event.endDate) {
         try {
           // Parse dates while preserving the original hour components
@@ -351,17 +341,14 @@ export const generateStudySessions = async (
           
           // Extract date components (YYYY-MM-DD)
           const startDateStr = startParts[0];
-          const endDateStr = endParts[0];
           
           // Extract time components (HH:MM:SS.sssZ)
           const startTimeStr = startParts[1];
           const endTimeStr = endParts[1];
           
-          // Extract hours and minutes without timezone adjustments
+          // Extract hours without timezone adjustments
           const startHour = parseInt(startTimeStr.substring(0, 2), 10);
-          const startMinute = parseInt(startTimeStr.substring(3, 5), 10);
           const endHour = parseInt(endTimeStr.substring(0, 2), 10);
-          const endMinute = parseInt(endTimeStr.substring(3, 5), 10);
           
           // Create date objects for day-based comparisons (ignoring time)
           const eventDate = new Date(startDateStr);

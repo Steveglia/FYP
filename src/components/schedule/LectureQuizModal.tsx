@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ScheduleEvent, Event } from './types';
+import { ScheduleEvent } from './types';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from "../../../amplify/data/resource";
 import { useAuthenticator } from '@aws-amplify/ui-react';
@@ -30,7 +30,6 @@ const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
   const [score, setScore] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [progress, setProgress] = useState<Record<string, ProgressData>>({});
   const [lectureScores, setLectureScores] = useState<Record<string, number>>({});
   
   // Load user progress data when modal opens
@@ -53,26 +52,16 @@ const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
       });
       
       if (userProgress.data && userProgress.data.length > 0) {
-        const progressByLecture: Record<string, ProgressData> = {};
         const scoresByLectureId: Record<string, number> = {};
         
         // Process all progress records
         userProgress.data.forEach(record => {
-          // Store course-level progress
-          if (record.courseId) {
-            progressByLecture[record.courseId] = {
-              completedLectures: record.completedLectures?.filter((item): item is string => item !== null) || [],
-              quizScore: record.quizScores || 0
-            };
-          }
-          
           // Store lecture-specific scores
           if (record.lectureId) {
             scoresByLectureId[record.lectureId] = record.quizScores || 0;
           }
         });
         
-        setProgress(progressByLecture);
         setLectureScores(scoresByLectureId);
         
         // Pre-fill with existing score if available for this specific lecture
@@ -82,9 +71,7 @@ const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
         } else {
           // Fallback to course score if no lecture-specific score
           const courseId = lecture.title?.split(':')[0]?.trim() || '';
-          if (progressByLecture[courseId] && progressByLecture[courseId].quizScore > 0) {
-            setScore(progressByLecture[courseId].quizScore);
-          }
+          // Assuming progressByLecture is not used in this function
         }
       }
     } catch (error) {

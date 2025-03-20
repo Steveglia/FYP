@@ -96,7 +96,7 @@ function App() {
           method: 'POST'
         }).then(() => {
           // File created
-        }).catch(err => {
+        }).catch(() => {
           // Error creating file
         });
       });

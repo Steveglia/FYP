@@ -84,7 +84,7 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
         // Fetch events for the current week
         const currentUserId = user?.username || userId;
         
-        const fetchedEvents = await fetchEvents(currentWeekStart, currentUserId);
+        const fetchedEvents = await fetchEvents(currentWeekStart);
         
         // Fetch accepted study sessions for the current week
         const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, currentUserId);
@@ -320,7 +320,7 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
       await deleteAcceptedStudySessions(currentWeekStart, user.username);
       
       // Update the events list to remove the deleted sessions
-      const fetchedEvents = await fetchEvents(currentWeekStart, user.username);
+      const fetchedEvents = await fetchEvents(currentWeekStart);
       setEvents(fetchedEvents);
       
       // Set hasAcceptedSessions to false since we've deleted them
@@ -465,7 +465,7 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
       
       // Fetch both regular events and accepted study sessions
       const currentUserId = user.username || userId;
-      const fetchedEvents = await fetchEvents(currentWeekStart, currentUserId);
+      const fetchedEvents = await fetchEvents(currentWeekStart);
       const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, currentUserId);
       
       // Update hasAcceptedSessions state
@@ -515,7 +515,7 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
       
       try {
         // Fetch events again to reflect any changes
-        const fetchedEvents = await fetchEvents(currentWeekStart, user.username);
+        const fetchedEvents = await fetchEvents(currentWeekStart);
         const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, user.username);
         
         // Combine them and update the state

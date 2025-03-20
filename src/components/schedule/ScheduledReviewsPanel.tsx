@@ -3,8 +3,6 @@ import { generateClient } from 'aws-amplify/api';
 import type { Schema } from '../../../amplify/data/resource';
 import './ScheduledReviewsPanel.css';
 
-type Nullable<T> = T | null;
-
 interface ScheduledReviewsProps {
   userId: string;
 }
