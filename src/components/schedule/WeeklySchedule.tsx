@@ -8,7 +8,9 @@ import {
   generateStudySessions, 
   saveAcceptedStudySession,
   fetchAcceptedStudySessions,
-  deleteAcceptedStudySessions
+  deleteAcceptedStudySessions,
+  generatePersonalLearningSlots,
+  getPersonalLearningItems
 } from './scheduleService';
 import ScheduleNavigation from './ScheduleNavigation';
 import ScheduleGrid from './ScheduleGrid';
@@ -46,7 +48,7 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
   const [loadingType, setLoadingType] = useState<'generate' | 'accept' | 'regenerate' | null>(null);
   
   // Add state for error
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | JSX.Element | null>(null);
   
   // Add state to track if there are accepted study sessions for the current week
   const [hasAcceptedSessions, setHasAcceptedSessions] = useState(false);
@@ -57,6 +59,9 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
   
   // Add a new state variable for recently completed lectures
   const [recentlyCompletedLectures, setRecentlyCompletedLectures] = useState<string[]>([]);
+  
+  // Add state for personal learning slots
+  const [personalLearningSlots, setPersonalLearningSlots] = useState<Event[]>([]);
   
   // Initialize with initial events
   useEffect(() => {
@@ -115,11 +120,11 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
     fetchData();
   }, [currentWeekStart, user, userId, initialEvents, events.length]);
   
-  // Combine regular events with generated study sessions and lectures
+  // Combine regular events with generated study sessions and lectures and personal learning slots
   const allEvents = useMemo(() => {
-    const combined = [...events, ...generatedStudySessions, ...lectures];
+    const combined = [...events, ...generatedStudySessions, ...lectures, ...personalLearningSlots];
     return combined;
-  }, [events, generatedStudySessions, lectures]);
+  }, [events, generatedStudySessions, lectures, personalLearningSlots]);
 
   // Process events into a schedule grid
   const eventsByDayAndTime = useMemo(() => {
@@ -535,28 +540,174 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
     fetchUpdatedData();
   };
 
+  // Handle generating personal learning time slots
+  const handleGeneratePersonalLearningSlots = async () => {
+    if (!user) {
+      setError('You must be logged in to generate personal learning slots.');
+      return;
+    }
+    
+    setIsLoading(true);
+    setLoadingType('generate');
+    setError(null);
+    
+    try {
+      // First, get all personal learning items to check if any are active
+      const personalLearningItems = await getPersonalLearningItems(user.username);
+      
+      if (personalLearningItems.length > 0) {
+        const activeItems = personalLearningItems.filter(item => item.isActive !== false);
+        
+        if (activeItems.length === 0) {
+          setError(
+            <div className="error-with-link">
+              <p>You have no active personal learning items.</p>
+              <p>Please <a href="/personal-learning">activate at least one item</a> in the Personal Learning page.</p>
+            </div>
+          );
+          setIsLoading(false);
+          setLoadingType(null);
+          return;
+        }
+      }
+      
+      const learningSlots = await generatePersonalLearningSlots(
+        currentWeekStart,
+        events,
+        lectures,
+        user.username
+      );
+      
+      if (learningSlots.length === 0) {
+        setError('No suitable personal learning times found. Try adding more free time to your schedule.');
+      } else {
+        setPersonalLearningSlots(learningSlots);
+      }
+    } catch (err: any) {
+      console.error('Error generating personal learning slots:', err);
+      
+      // Provide a more specific error message if possible
+      if (err.message && err.message.includes('parse')) {
+        setError('Error processing the scheduling algorithm response. Please try again later.');
+      } else {
+        setError('Failed to generate personal learning slots. Please try again later.');
+      }
+    } finally {
+      setIsLoading(false);
+      setLoadingType(null);
+    }
+  };
+
+  // Clear personal learning slots
+  const clearPersonalLearningSlots = () => {
+    setPersonalLearningSlots([]);
+  };
+
   return (
     <div className="weekly-schedule">
-      <div className="schedule-controls">
-        <ScheduleNavigation 
+      <div className="schedule-header">
+        <ScheduleNavigation
           currentWeekStart={currentWeekStart}
-          navigateWeek={navigateWeek}
-          handleGenerateStudySessions={handleGenerateStudySessions}
-          handleRegenerateStudySessions={handleRegenerateStudySessions}
-          hasGeneratedSessions={generatedStudySessions.length > 0}
-          hasAcceptedSessions={hasAcceptedSessions}
-          clearStudySessions={clearStudySessions}
-          handleAcceptAllSessions={handleAcceptAllSessions}
-          isLoading={isLoading}
-          loadingType={loadingType}
+          onNavigate={navigateWeek}
+          formatWeekDate={formatWeekDate}
         />
         
-        {error && (
-          <div className="error-message">
-            {error}
+        <div className="schedule-actions">
+          {/* Study Sessions generation button */}
+          <div className="action-group">
+            {hasAcceptedSessions ? (
+              <button 
+                className="action-button regenerate-button"
+                onClick={handleRegenerateStudySessions}
+                disabled={isLoading}
+              >
+                {isLoading && loadingType === 'regenerate' ? (
+                  <span className="loading-spinner"></span>
+                ) : (
+                  'Regenerate Study Sessions'
+                )}
+              </button>
+            ) : generatedStudySessions.length > 0 ? (
+              <div className="button-group">
+                <button 
+                  className="action-button accept-button"
+                  onClick={handleAcceptAllSessions}
+                  disabled={isLoading}
+                >
+                  {isLoading && loadingType === 'accept' ? (
+                    <span className="loading-spinner"></span>
+                  ) : (
+                    'Accept Study Sessions'
+                  )}
+                </button>
+                <button 
+                  className="action-button clear-button"
+                  onClick={clearStudySessions}
+                  disabled={isLoading}
+                >
+                  Clear
+                </button>
+              </div>
+            ) : (
+              <button 
+                className="action-button generate-button"
+                onClick={handleGenerateStudySessions}
+                disabled={isLoading}
+              >
+                {isLoading && loadingType === 'generate' ? (
+                  <span className="loading-spinner"></span>
+                ) : (
+                  'Generate Study Sessions'
+                )}
+              </button>
+            )}
           </div>
-        )}
+          
+          {/* Personal Learning slots generation button */}
+          <div className="action-group">
+            {personalLearningSlots.length > 0 ? (
+              <div className="button-group">
+                <button 
+                  className="action-button accept-button"
+                  onClick={() => {
+                    // For now, we don't have a "save" function for personal learning slots
+                    // This could be added later if needed
+                    alert('Personal learning slots created. You can view them on your schedule.');
+                  }}
+                  disabled={isLoading}
+                >
+                  Accept Learning Hours
+                </button>
+                <button 
+                  className="action-button clear-button"
+                  onClick={clearPersonalLearningSlots}
+                  disabled={isLoading}
+                >
+                  Clear
+                </button>
+              </div>
+            ) : (
+              <button 
+                className="action-button generate-button personal-learning-button"
+                onClick={handleGeneratePersonalLearningSlots}
+                disabled={isLoading}
+              >
+                {isLoading && loadingType === 'generate' ? (
+                  <span className="loading-spinner"></span>
+                ) : (
+                  'Generate Personal Learning Hours'
+                )}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
+      
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
       
       <ScheduleGrid 
         eventsByDayAndTime={eventsByDayAndTime} 

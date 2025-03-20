@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { generateClient } from 'aws-amplify/api';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import type { Schema } from '../../amplify/data/resource';
+import { getPersonalLearningItems, togglePersonalLearningStatus } from './schedule/scheduleService';
 import './PersonalLearning.css';
 
 const client = generateClient<Schema>();
@@ -37,29 +38,23 @@ const PersonalLearning: React.FC = () => {
     setMessage(null);
     
     try {
-      // Load personal learning items
-      const result = await client.models.PersonalLearning.list({
-        filter: { userId: { eq: user.username } }
-      });
-      
-      if (result.errors) {
-        throw new Error(`Failed to load items: ${JSON.stringify(result.errors)}`);
-      }
+      // Load personal learning items using our service function
+      const items = await getPersonalLearningItems(user.username);
       
       // If no items found and it's the current user, create a sample item
-      if (result.data.length === 0) {
+      if (items.length === 0) {
         await createSampleItem();
         return;
       }
       
       // Transform API response to match our expected types
-      const transformedItems = result.data.map((item: any) => ({
+      const transformedItems = items.map(item => ({
         id: item.id,
         userId: item.userId,
         subject: item.subject,
         totalRequiredHours: item.totalRequiredHours,
         weeklyDedicationHours: item.weeklyDedicationHours,
-        isActive: true // Default to active
+        isActive: item.isActive !== false // default to true if undefined
       }));
 
       setLearningItems(transformedItems);
@@ -80,7 +75,8 @@ const PersonalLearning: React.FC = () => {
         userId: user!.username,
         subject: "Learn Python",
         totalRequiredHours: 30,
-        weeklyDedicationHours: 2
+        weeklyDedicationHours: 2,
+        isActive: true
       });
       
       if (errors) {
@@ -99,12 +95,45 @@ const PersonalLearning: React.FC = () => {
     }
   };
 
-  const handleToggleActive = (id: string) => {
-    setLearningItems(prevItems => 
-      prevItems.map(item => 
-        item.id === id ? { ...item, isActive: !item.isActive } : item
-      )
-    );
+  const handleToggleActive = async (id: string) => {
+    // Find the current item to get its current status
+    const item = learningItems.find(item => item.id === id);
+    if (!item) return;
+    
+    try {
+      // Update locally first for immediate UI feedback
+      setLearningItems(prevItems => 
+        prevItems.map(item => 
+          item.id === id ? { ...item, isActive: !item.isActive } : item
+        )
+      );
+      
+      // Call our service function to toggle the status in the backend
+      const success = await togglePersonalLearningStatus(id);
+      
+      if (success) {
+        const newStatus = !item.isActive;
+        setMessage({ 
+          type: 'success', 
+          text: `Learning item "${item.subject}" is now ${newStatus ? 'active' : 'inactive'}!`
+        });
+        setTimeout(() => setMessage(null), 3000);
+      } else {
+        // If backend update fails, revert the local state
+        setLearningItems(prevItems => 
+          prevItems.map(i => 
+            i.id === id ? { ...i, isActive: item.isActive } : i
+          )
+        );
+        throw new Error("Failed to update status in the database.");
+      }
+    } catch (error) {
+      console.error("Error toggling active status:", error);
+      setMessage({
+        type: 'error',
+        text: `Failed to toggle status: ${(error as Error).message}`
+      });
+    }
   };
 
   const handleWeeklyHoursChange = async (id: string, newHours: number) => {
@@ -197,7 +226,7 @@ const PersonalLearning: React.FC = () => {
                     <label className="toggle-switch">
                       <input 
                         type="checkbox" 
-                        checked={item.isActive} 
+                        checked={!!item.isActive} 
                         onChange={() => handleToggleActive(item.id || '')}
                       />
                       <span className="toggle-slider"></span>
@@ -242,6 +271,12 @@ const PersonalLearning: React.FC = () => {
                       <span className="value">
                         {calculateEstimatedWeeks(item.totalRequiredHours, item.weeklyDedicationHours)} weeks
                       </span>
+                    </div>
+                  )}
+                  
+                  {!item.isActive && (
+                    <div className="inactive-message">
+                      <p>This learning item is currently inactive and won't be included in scheduling.</p>
                     </div>
                   )}
                 </div>

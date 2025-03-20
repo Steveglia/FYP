@@ -9,7 +9,7 @@ export interface Event extends Omit<BaseEvent, 'type'> {
   isLecture?: boolean;
   isLab?: boolean;
   userId?: string;
-  type?: 'WORK' | 'STUDY' | 'MEETING' | 'OTHER' | 'LECTURE' | 'LAB' | null;
+  type?: 'WORK' | 'STUDY' | 'MEETING' | 'OTHER' | 'LECTURE' | 'LAB' | 'LEARNING' | null;
 }
 
 export interface ScheduleEvent extends Event {
@@ -21,7 +21,7 @@ export interface ScheduleEvent extends Event {
 }
 
 // Event type definitions for our application
-export type EventType = 'WORK' | 'STUDY' | 'MEETING' | 'OTHER' | 'LECTURE' | 'LAB';
+export type EventType = 'WORK' | 'STUDY' | 'MEETING' | 'OTHER' | 'LECTURE' | 'LAB' | 'LEARNING';
 
 // Color mapping for different event types
 export const eventTypeColors = {
@@ -31,6 +31,7 @@ export const eventTypeColors = {
   OTHER: '#f39c12',   // orange for other events
   LECTURE: '#9b59b6', // purple for lectures
   LAB: '#1abc9c',     // teal for labs
+  LEARNING: '#6aa84f', // green for personal learning
   default: '#95a5a6'  // grey for unknown types
 };
 
@@ -48,7 +49,8 @@ export function ensureValidEventType(type: string | null | undefined): EventType
       type === 'MEETING' || 
       type === 'OTHER' || 
       type === 'LECTURE' || 
-      type === 'LAB') {
+      type === 'LAB' ||
+      type === 'LEARNING') {
     return type;
   }
   

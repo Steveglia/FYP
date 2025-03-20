@@ -404,7 +404,8 @@ export const generateStudySessions = async (
       console.log('\nCalling generatePreferenceVector API...');
       const result = await client.queries.generatePreferenceVector({
         availabilityVector: JSON.stringify(availabilityVector),
-        userId
+        userId,
+        mode: 'STUDY'
       });
       
       if (result.data) {
@@ -512,7 +513,7 @@ export const generateStudySessions = async (
                 console.error('Error creating study session:', sessionError);
                 return null;
               }
-            }).filter(event => event !== null) as Event[];
+            }).filter((event: any) => event !== null) as Event[]; // Force type assertion
             
             console.log('\n===== GENERATED STUDY SESSIONS =====');
             studyEvents.forEach((session, index) => {
@@ -586,5 +587,439 @@ export const deleteAcceptedStudySessions = async (weekStartDate: Date, userId: s
   } catch (error) {
     console.error('Error deleting accepted study sessions:', error);
     return false;
+  }
+};
+
+// Generate personal learning time slots using branch and bound algorithm
+export const generatePersonalLearningSlots = async (
+  currentWeekStart: Date,
+  currentEvents: Event[],
+  currentLectures: Event[],
+  userId: string
+): Promise<Event[]> => {
+  try {
+    // Calculate week end date
+    const weekEndDate = new Date(currentWeekStart);
+    weekEndDate.setDate(currentWeekStart.getDate() + 7);
+    
+    // Format dates for query
+    const startDateStr = currentWeekStart.toISOString();
+    const endDateStr = weekEndDate.toISOString();
+    
+    // Fetch events directly from the database for the current week
+    const eventsResult = await client.models.CalendarEvent.list({
+      filter: {
+        and: [
+          { startDate: { ge: startDateStr } },
+          { startDate: { lt: endDateStr } }
+        ]
+      }
+    });
+    
+    // Fetch lectures directly from the database for the current week
+    const lecturesResult = await client.models.Lectures.list({
+      filter: {
+        and: [
+          { start_date: { ge: startDateStr } },
+          { start_date: { lt: endDateStr } }
+        ]
+      }
+    });
+    
+    // Process lectures into Event format
+    let dbLectures: Event[] = [];
+    
+    if (lecturesResult.data) {
+      // Process each lecture (similar to the generateStudySessions function)
+      for (const lecture of lecturesResult.data) {
+        const now = new Date().toISOString();
+        const isLab = lecture.title?.toLowerCase().includes('lab') || 
+                     lecture.content?.toLowerCase().includes('lab') ||
+                     lecture.summary?.toLowerCase().includes('lab');
+        
+        // Ensure we have valid start and end dates
+        let startDate = lecture.start_date;
+        let endDate = lecture.end_date;
+        
+        // If start_date or end_date are missing or invalid, skip this lecture
+        if (!startDate || !endDate) {
+          console.error('Invalid lecture data - missing start or end date:', lecture);
+          continue;
+        }
+        
+        // Create the event object
+        const event: Event = {
+          id: lecture.id || `${isLab ? 'lab' : 'lecture'}-${Date.now()}-${lecture.lectureId}`,
+          title: `${lecture.courseId}: ${lecture.title || 'Untitled'}`,
+          description: lecture.content || lecture.summary || `${isLab ? 'Lab' : 'Lecture'} for ${lecture.courseId}`,
+          type: 'OTHER',
+          startDate: startDate,
+          endDate: endDate,
+          location: lecture.location || 'Unknown',
+          createdAt: now,
+          updatedAt: now
+        };
+        
+        // Add custom properties
+        (event as any).isLecture = !isLab;
+        (event as any).isLab = isLab;
+        
+        // Add to the array
+        dbLectures.push(event);
+      }
+    }
+    
+    // Combine events from database with lectures
+    const dbEvents = eventsResult.data || [];
+    const allEvents = [...dbEvents, ...dbLectures, ...currentEvents, ...currentLectures];
+    
+    console.log('Total events for availability calculation:', allEvents.length);
+    
+    // Create initial availability vector (all available)
+    const availabilityVector = new Array(105).fill(1);
+    
+    // Log the vector in a readable format for each day
+    const logVectorByDay = (vector: number[]) => {
+      const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      weekDays.forEach((day, dayIndex) => {
+        const dayVector = vector.slice(dayIndex * 15, (dayIndex + 1) * 15);
+        console.log(`${day}:`, dayVector.join(' '));
+      });
+    };
+    
+    // Mark unavailable times based on events and lectures from database
+    allEvents.forEach((event) => {
+      if (event.startDate && event.endDate) {
+        try {
+          // Parse dates while preserving the original hour components
+          const startDateRaw = event.startDate;
+          const endDateRaw = event.endDate;
+          
+          // Extract components without time zone adjustments
+          const startParts = startDateRaw.split('T');
+          const endParts = endDateRaw.split('T');
+          
+          if (startParts.length !== 2 || endParts.length !== 2) {
+            console.error(`Event "${event.title}" has invalid ISO date format`);
+            return; // Skip this event
+          }
+          
+          // Extract date components (YYYY-MM-DD)
+          const startDateStr = startParts[0];
+          
+          // Extract time components (HH:MM:SS.sssZ)
+          const startTimeStr = startParts[1];
+          const endTimeStr = endParts[1];
+          
+          // Extract hours without timezone adjustments
+          const startHour = parseInt(startTimeStr.substring(0, 2), 10);
+          const endHour = parseInt(endTimeStr.substring(0, 2), 10);
+          
+          // Create date objects for day-based comparisons
+          const eventDate = new Date(startDateStr);
+          
+          // Verify the event is within the current week
+          const weekStart = new Date(currentWeekStart);
+          weekStart.setHours(0, 0, 0, 0);
+          
+          const weekEnd = new Date(weekEndDate);
+          weekEnd.setHours(0, 0, 0, 0);
+          
+          // Check if the event is in the current week
+          const isAfterWeekStart = eventDate.getTime() >= weekStart.getTime();
+          const isBeforeWeekEnd = eventDate.getTime() < weekEnd.getTime();
+          
+          // Only process events that are within the current week
+          if (isAfterWeekStart && isBeforeWeekEnd) {
+            // Get the day of week from date part only (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+            const startDayOfWeek = eventDate.getDay();
+            // Convert to our index (0 = Monday, ..., 6 = Sunday)
+            const dayIndex = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
+            
+            // Mark time slots as unavailable
+            for (let hour = startHour; hour <= Math.min(endHour, 22); hour++) {
+              if (hour >= 8 && hour <= 22) {
+                const vectorIndex = (dayIndex * 15) + (hour - 8);
+                if (vectorIndex >= 0 && vectorIndex < availabilityVector.length) {
+                  availabilityVector[vectorIndex] = 0; // Mark as unavailable
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error processing event:', event.title, error);
+        }
+      }
+    });
+    
+    // Log availability vector
+    console.log('\n===== AVAILABILITY VECTOR FOR PERSONAL LEARNING =====');
+    logVectorByDay(availabilityVector);
+    
+    try {
+      // First, get the preference vector from user's availability
+      console.log('\nCalling generatePreferenceVector API...');
+      const preferenceVectorResult = await client.queries.generatePreferenceVector({
+        availabilityVector: JSON.stringify(availabilityVector),
+        userId,
+        mode: 'LEARNING'
+      });
+      
+      // Next, check for personal learning items to determine hours needed
+      const personalLearningResult = await client.models.PersonalLearning.list({
+        filter: { userId: { eq: userId } }
+      });
+      
+      let weeklyLearningHours = 0;
+      
+      // Calculate total weekly hours from active personal learning items
+      if (personalLearningResult.data && personalLearningResult.data.length > 0) {
+        // Filter to only include active items
+        const activeItems = personalLearningResult.data.filter(item => item.isActive !== false);
+        weeklyLearningHours = activeItems.reduce((total, item) => total + item.weeklyDedicationHours, 0);
+        
+        console.log(`Found ${activeItems.length} active personal learning items out of ${personalLearningResult.data.length} total`);
+        console.log(`Total weekly dedication: ${weeklyLearningHours} hours`);
+      } else {
+        // Default to 10 hours if no personal learning items found
+        weeklyLearningHours = 10;
+        console.log('No personal learning items found, using default of 10 hours per week');
+      }
+      
+      if (weeklyLearningHours <= 0) {
+        console.log('No hours to schedule for personal learning');
+        return [];
+      }
+      
+      // Now use the Branch and Bound algorithm to generate optimal time slots
+      // We pass in the preference vector, and the algorithm returns time slots
+      if (preferenceVectorResult.data) {
+        console.log('\nCalling branchAndBound API with preference vector to get optimal time slots...');
+        
+        const branchAndBoundResult = await client.queries.branchAndBound({
+          preferenceVector: preferenceVectorResult.data,
+          requiredHours: weeklyLearningHours,
+          maxDailyHours: 3, // Maximum 3 hours of personal learning per day
+          preferTwoHourBlocks: true,
+          penalizeSingleHourBlocks: true,
+          penalizeLongBlocks: true
+        });
+        
+        console.log('Branch and Bound result:', branchAndBoundResult);
+        
+        if (branchAndBoundResult.data) {
+          try {
+            // Print diagnostics
+            console.log('Raw response type:', typeof branchAndBoundResult.data);
+            
+            // Parse the response if it's a string
+            let parsedResponse: any;
+            if (typeof branchAndBoundResult.data === 'string') {
+              try {
+                console.log('Response string first 100 chars:', branchAndBoundResult.data.substring(0, 100));
+                parsedResponse = JSON.parse(branchAndBoundResult.data);
+              } catch (error) {
+                console.error('Error parsing JSON response:', error);
+                throw new Error(`Failed to parse branchAndBound response: ${error}`);
+              }
+            } else {
+              parsedResponse = branchAndBoundResult.data;
+            }
+            
+            // Extract the timeSlots array from the response
+            const timeSlots = parsedResponse?.timeSlots || [];
+            
+            console.log('Extracted timeSlots:', timeSlots);
+            
+            if (!timeSlots || !Array.isArray(timeSlots) || timeSlots.length === 0) {
+              console.log('No time slots returned from the algorithm');
+              return [];
+            }
+            
+            // Convert time slots to events
+            const learningEvents = timeSlots.map((slot: any, index: number) => {
+              // Skip invalid slots
+              if (!slot || !slot.day || slot.hour === undefined) {
+                return null;
+              }
+              
+              try {
+                // Get the day index
+                const dayIndex = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(slot.day);
+                if (dayIndex === -1) return null;
+                
+                // Create the date
+                const slotDate = new Date(currentWeekStart);
+                slotDate.setDate(currentWeekStart.getDate() + dayIndex);
+                
+                // Set times
+                const startHour = parseInt(slot.hour);
+                const endHour = startHour + 1;
+                
+                slotDate.setHours(startHour, 0, 0, 0);
+                const startIso = slotDate.toISOString();
+                
+                slotDate.setHours(endHour, 0, 0, 0);
+                const endIso = slotDate.toISOString();
+                
+                // Create event with a safe type
+                return {
+                  id: `learning-${Date.now()}-${index}`,
+                  title: `Personal Learning`,
+                  description: `Personal learning time slot`,
+                  type: 'LEARNING',
+                  startDate: startIso,
+                  endDate: endIso,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                };
+              } catch (err) {
+                console.error('Error creating event from slot:', err);
+                return null;
+              }
+            })
+            .filter((event: any) => event !== null) as Event[];
+            
+            // Log the created events
+            console.log(`Created ${learningEvents.length} learning events`);
+            
+            return learningEvents;
+          } catch (error) {
+            console.error('Error handling branch and bound response:', error);
+            return [];
+          }
+        } else {
+          console.error('No data in branchAndBound response');
+          return [];
+        }
+      } else {
+        console.error('No data returned from generatePreferenceVector API');
+        return [];
+      }
+    } catch (error) {
+      console.error('Error generating personal learning slots:', error);
+      return [];
+    }
+  } catch (error) {
+    console.error('Error in generatePersonalLearningSlots:', error);
+    return [];
+  }
+};
+
+// Helper function to convert time slots to events
+function convertTimeSlotsToEvents(timeSlots: any[] | undefined, currentWeekStart: Date): Event[] {
+  if (!timeSlots || !Array.isArray(timeSlots) || timeSlots.length === 0) {
+    return [];
+  }
+  
+  // Type guard to ensure we only return valid Event objects
+  const isEvent = (obj: any): obj is Event => {
+    return obj && obj.startDate && obj.endDate && obj.title;
+  };
+  
+  const learningEvents = timeSlots.map((slot: {day: string; hour: number}) => {
+    try {
+      // Convert the day name to day index (0 for Monday, 6 for Sunday)
+      const dayIndex = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(slot.day);
+      if (dayIndex === -1) {
+        console.error('Invalid day name:', slot.day);
+        return null;
+      }
+      
+      // Create a date for the specific day and hour
+      const eventDate = new Date(currentWeekStart);
+      eventDate.setDate(currentWeekStart.getDate() + dayIndex);
+      
+      // Set the start time
+      const startDate = new Date(eventDate);
+      startDate.setHours(slot.hour, 0, 0, 0);
+      
+      // Set the end time (1 hour later)
+      const endDate = new Date(startDate);
+      endDate.setHours(startDate.getHours() + 1);
+      
+      // Generate a unique ID for this event
+      const id = `learning-${dayIndex}-${slot.hour}-${Date.now()}`;
+      
+      return {
+        id,
+        title: `Personal Learning`,
+        description: 'Allocated time for personal learning and studying',
+        type: 'LEARNING',
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Error creating learning time slot:', error);
+      return null;
+    }
+  }).filter(isEvent);
+  
+  console.log('\n===== GENERATED PERSONAL LEARNING SLOTS =====');
+  // Make sure we only log valid events with startDate and endDate
+  learningEvents.forEach((slot: any) => {
+    if (slot) {
+      console.log(`Slot:`, {
+        day: slot.startDate ? new Date(slot.startDate).toLocaleDateString('en-GB', { weekday: 'long' }) : 'Unknown',
+        startTime: slot.startDate ? new Date(slot.startDate).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'Unknown',
+        endTime: slot.endDate ? new Date(slot.endDate).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'Unknown'
+      });
+    }
+  });
+  
+  return learningEvents as Event[];
+}
+
+// Toggle the active status of a personal learning item
+export const togglePersonalLearningStatus = async (personalLearningId: string): Promise<boolean> => {
+  try {
+    // First get the current item
+    const result = await client.models.PersonalLearning.get({
+      id: personalLearningId
+    });
+    
+    if (!result.data) {
+      console.error('Personal learning item not found:', personalLearningId);
+      return false;
+    }
+    
+    // Toggle the isActive status
+    const currentStatus = result.data.isActive !== false; // Handle undefined (treat as active)
+    const newStatus = !currentStatus;
+    
+    console.log(`Toggling personal learning item ${personalLearningId} from ${currentStatus ? 'active' : 'inactive'} to ${newStatus ? 'active' : 'inactive'}`);
+    
+    // Update the item with the new status
+    const updateResult = await client.models.PersonalLearning.update({
+      id: personalLearningId,
+      isActive: newStatus
+    });
+    
+    if (updateResult.data) {
+      console.log('Successfully updated personal learning status:', updateResult.data);
+      return true;
+    } else {
+      console.error('Failed to update personal learning status');
+      return false;
+    }
+  } catch (error) {
+    console.error('Error toggling personal learning status:', error);
+    return false;
+  }
+};
+
+// Get all personal learning items for a user
+export const getPersonalLearningItems = async (userId: string): Promise<Schema['PersonalLearning']['type'][]> => {
+  try {
+    const result = await client.models.PersonalLearning.list({
+      filter: { userId: { eq: userId } }
+    });
+    
+    return result.data || [];
+  } catch (error) {
+    console.error('Error fetching personal learning items:', error);
+    return [];
   }
 }; 

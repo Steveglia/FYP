@@ -3,6 +3,7 @@ import { store_events } from "../functions/storeEvents/resource";
 import { store_lectures } from "../functions/storeLectures/resource";
 import { generatePreferenceVector } from "../functions/generatePreferenceVector/resource";
 import { generateStudySessions } from "../functions/generateStudySessions/resource";
+import { branchAndBound } from "../functions/branchAndBound/resource";
 
 const schema = a
   .schema({
@@ -11,6 +12,7 @@ const schema = a
       .arguments({
         availabilityVector: a.string(),
         userId: a.string(),
+        mode: a.string(),
       })
       .returns(
         a.string()
@@ -26,6 +28,20 @@ const schema = a
       })
       .returns(a.string())
       .handler(a.handler.function(generateStudySessions))
+      .authorization(allow => [allow.publicApiKey()]),
+      
+    branchAndBound: a
+      .query()
+      .arguments({
+        preferenceVector: a.string(),
+        requiredHours: a.integer(),
+        maxDailyHours: a.integer(),
+        preferTwoHourBlocks: a.boolean(),
+        penalizeSingleHourBlocks: a.boolean(),
+        penalizeLongBlocks: a.boolean(),
+      })
+      .returns(a.string())
+      .handler(a.handler.function(branchAndBound))
       .authorization(allow => [allow.publicApiKey()]),
 
     CalendarEvent: a
@@ -61,6 +77,7 @@ const schema = a
         subject: a.string().required(),
         totalRequiredHours: a.integer().required(),
         weeklyDedicationHours: a.integer().required(),
+        isActive: a.boolean().required().default(true),
       })
       .authorization(allow => [allow.publicApiKey()]),
       
@@ -71,7 +88,8 @@ const schema = a
         lunchBreakStart: a.string(),
         lunchBreakDuration: a.integer(),
         studyDuringWork: a.boolean(),
-        preferredTimeOfDay: a.enum(['MORNING', 'EVENING']),
+        preferredTimeOfDay: a.enum(['MORNING', 'AFTERNOON', 'EVENING', 'PERSONALIZE']),
+        personalizedVector: a.string(),
         owner: a.string(),
         courses: a.string().array()
       })

@@ -120,9 +120,20 @@ class FitnessEvaluator {
     for (let i = 0; i < solution.length; i++) {
       if (this.preferences[i] <= 0 && solution[i] === 1) {
         invalidSlotCount++;
+        
+        // Apply an extremely large penalty for slots with preference value 0 (user marked as unavailable)
+        // This makes it virtually impossible for the algorithm to select these slots
+        if (this.preferences[i] === 0) {
+          // Using 100000 as an effectively infinite penalty
+          penalties += 100000;
+        } else {
+          penalties += 1000;
+        }
       }
     }
-    penalties += invalidSlotCount * 1000;
+    
+    // Keep track of invalid slots but don't add additional penalty (already added above)
+    this.lastPenaltyDetails.invalidSlotCount = invalidSlotCount;
 
     // 2. Total study hours must match config
     const totalStudyHours = solution.reduce((sum, val) => sum + val, 0);
@@ -849,6 +860,30 @@ export const handler: Schema["generateStudySessions"]["functionHandler"] = async
     }
   }
   console.log('Study slots:', JSON.stringify(studySlots, null, 2));
+  
+  // Verify that no unavailable slots have been selected
+  let unavailableSlotSelected = false;
+  let unavailableSlots: { day: string, hour: number, index: number }[] = [];
+  
+  for (let i = 0; i < bestSolution.length; i++) {
+    if (bestSolution[i] === 1 && weekVector[i] === 0) {
+      const dayIndex = Math.floor(i / config.HOURS_PER_DAY);
+      const hour = i % config.HOURS_PER_DAY;
+      unavailableSlotSelected = true;
+      
+      unavailableSlots.push({
+        day: availableDays[dayIndex],
+        hour: hour + 8,
+        index: i
+      });
+    }
+  }
+  
+  if (unavailableSlotSelected) {
+    console.error('WARNING: Study sessions were scheduled during unavailable time slots:', JSON.stringify(unavailableSlots, null, 2));
+  } else {
+    console.log('Verification successful: No study sessions were scheduled during unavailable time slots');
+  }
   
   // Return the formatted sessions as a JSON string
   return JSON.stringify(formattedSessions);

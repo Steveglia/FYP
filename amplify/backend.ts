@@ -5,6 +5,7 @@ import { users_events, lectures_data } from './storage/resource';
 import { store_events } from './functions/storeEvents/resource';
 import { generatePreferenceVector } from './functions/generatePreferenceVector/resource';
 import { generateStudySessions } from './functions/generateStudySessions/resource';
+import { branchAndBound } from './functions/branchAndBound/resource';
 import { EventType } from 'aws-cdk-lib/aws-s3';
 import { LambdaDestination } from 'aws-cdk-lib/aws-s3-notifications';
 import { store_lectures } from './functions/storeLectures/resource';
@@ -19,6 +20,7 @@ const backend = defineBackend({
   store_lectures,
   generatePreferenceVector,
   generateStudySessions,
+  branchAndBound,
 });
 
 // Event notification for store_events function

@@ -16,7 +16,7 @@ Amplify.configure(outputs);
 const client = generateClient<Schema>();
 
 export const handler: Schema["generatePreferenceVector"]["functionHandler"] = async (event) => {
-  const { availabilityVector, userId } = event.arguments;
+  const { availabilityVector, userId, mode } = event.arguments;
   
   // Define weekDays internally since it's always the same
   const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -60,6 +60,40 @@ export const handler: Schema["generatePreferenceVector"]["functionHandler"] = as
             } else {
               weekVector[vectorIndex] = 2;
             }
+          } else if (studyPreference.preferredTimeOfDay === 'AFTERNOON') {
+            if (hour >= 12 && hour <= 17) {
+              weekVector[vectorIndex] = 9;
+            } else if ((hour >= 17 && hour <= 19) || (hour >= 10 && hour < 12)) {
+              weekVector[vectorIndex] = 6;
+            } else if ((hour >= 8 && hour < 10) || (hour > 19 && hour <= 20)) {
+              weekVector[vectorIndex] = 4;
+            } else {
+              // Very early (before 8) or very late (after 20) hours
+              weekVector[vectorIndex] = 2;
+            }
+          } else if (studyPreference.preferredTimeOfDay === 'PERSONALIZE' && studyPreference.personalizedVector) {
+            try {
+              // Parse the personalized vector from the stored JSON string
+              const personalizedVector = JSON.parse(studyPreference.personalizedVector);
+              
+              // Use the personalized preference value, but only for available time slots
+              if (personalizedVector && Array.isArray(personalizedVector) && personalizedVector.length === 105) {
+                // If the personalized value is 0, this time slot is unavailable
+                if (personalizedVector[vectorIndex] === 0) {
+                  weekVector[vectorIndex] = 0; // Mark as unavailable
+                  console.log(`Marking slot ${vectorIndex} (Day ${dayIndex + 1}, Hour ${hour}) as unavailable (0) based on user preference`);
+                } else {
+                  weekVector[vectorIndex] = personalizedVector[vectorIndex];
+                  console.log(`Setting slot ${vectorIndex} (Day ${dayIndex + 1}, Hour ${hour}) to preference value ${personalizedVector[vectorIndex]}`);
+                }
+              } else {
+                console.error('Invalid personalizedVector structure:', personalizedVector);
+              }
+            } catch (error) {
+              console.error('Error parsing personalizedVector:', error);
+              // In case of error, keep the slot available but with neutral preference
+              weekVector[vectorIndex] = 4;
+            }
           }
         }
       }
@@ -76,10 +110,18 @@ export const handler: Schema["generatePreferenceVector"]["functionHandler"] = as
   // Convert the vector to a string
   const preferenceVectorString = JSON.stringify(weekVector);
   
-  // Initialize studySessions variable
-  let studySessions = null;
+  // Check mode parameter to determine which action to take
+  const operationMode = mode || 'STUDY'; // Default to STUDY for backward compatibility
   
-  // Generate study sessions using the preference vector
+  console.log(`Operating in ${operationMode} mode for user: ${userId}`);
+  
+  // For LEARNING mode, just return the preference vector
+  if (operationMode === 'LEARNING') {
+    console.log('Returning preference vector for personal learning optimization');
+    return preferenceVectorString;
+  }
+  
+  // For STUDY mode or default, generate study sessions
   try {
     console.log('Initiating study sessions generation for user:', userId);
     
@@ -90,12 +132,11 @@ export const handler: Schema["generatePreferenceVector"]["functionHandler"] = as
     });
     
     console.log('Successfully generated study sessions:', result);
-    studySessions = result;
+    return JSON.stringify(result);
   } catch (error) {
     // Log the error but don't fail the function
     console.error('Error generating study sessions:', error);
+    // Return the preference vector as fallback
+    return preferenceVectorString;
   }
-  
-  
-  return JSON.stringify(studySessions);
 };
