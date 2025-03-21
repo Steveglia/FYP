@@ -135,6 +135,15 @@ const schema = a
       })
       .authorization(allow => [allow.publicApiKey()]),
 
+    FocusCoefficient: a
+      .model({
+        userId: a.string().required(),
+        focusVector: a.string().required(), // Will store a vector of 105 values as a string
+        lastUpdated: a.string(), // Optional timestamp of when the vector was last updated
+        useFocusCoefficient: a.boolean().default(true) // Flag to enable/disable focus coefficient usage
+      })
+      .authorization(allow => [allow.publicApiKey()]),
+
   })
   .authorization(allow => [
     allow.resource(store_events),

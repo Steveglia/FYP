@@ -35,6 +35,12 @@ const Navigation = () => {
         >
           Personal Learning
         </NavLink>
+        <NavLink 
+          to="/focus-coefficient" 
+          className={({ isActive }) => isActive ? 'active' : ''}
+        >
+          Focus Settings
+        </NavLink>
       </div>
       <button onClick={signOut} className="sign-out-btn">Sign out</button>
     </nav>

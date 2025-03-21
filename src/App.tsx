@@ -11,6 +11,7 @@ import Preferences from './pages/Preferences';
 import ReviewSessions from './pages/ReviewSessions';
 import CourseSelection from './components/CourseSelection';
 import PersonalLearning from './components/PersonalLearning';
+import FocusCoefficient from './pages/FocusCoefficient';
 import './App.css';
 import './components/CourseSelection.css';
 
@@ -100,6 +101,7 @@ function App() {
           <Route path="/preferences" element={<Preferences />} />
           <Route path="/courses" element={<CourseSelection onCoursesChange={handleCoursesChange} />} />
           <Route path="/personal-learning" element={<PersonalLearning />} />
+          <Route path="/focus-coefficient" element={<FocusCoefficient />} />
         </Routes>
       </main>
     </div>
