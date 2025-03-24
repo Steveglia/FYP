@@ -2,16 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { generateClient } from 'aws-amplify/data';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import type { Schema } from '../../amplify/data/resource';
+import './CourseSelection.css';
 
 const client = generateClient<Schema>();
 
-const courses = [
-  'Compilers',
-  'Maths',
-  'Programming',
-  'Machine Learning'
-];
-
+// Simplify to just use string IDs instead of the CourseData interface
 interface CourseSelectionProps {
   onCoursesChange?: (selectedCourses: string[]) => void;
 }
@@ -19,12 +14,44 @@ interface CourseSelectionProps {
 const CourseSelection: React.FC<CourseSelectionProps> = ({ onCoursesChange }) => {
   const { user } = useAuthenticator();
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+  const [allCourses, setAllCourses] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
+  // Fetch courses from the Lectures database
   useEffect(() => {
-    async function loadCourses() {
+    async function fetchCourses() {
+      try {
+        const { data: lectures, errors } = await client.models.Lectures.list();
+        
+        if (errors) {
+          throw new Error('Failed to load lecture data');
+        }
+        
+        // Extract unique course IDs from lectures and filter out any null values
+        const uniqueCourseIds = Array.from(
+          new Set(
+            lectures
+              .map(lecture => lecture.courseId)
+              .filter((courseId): courseId is string => courseId !== null && courseId !== undefined)
+          )
+        );
+        
+        setAllCourses(uniqueCourseIds);
+      } catch (error) {
+        console.error("Error fetching courses:", error);
+        setMessage({ type: 'error', text: 'Failed to fetch available courses' });
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    fetchCourses();
+  }, []);
+
+  useEffect(() => {
+    async function loadUserSelectedCourses() {
       if (!user) {
         setLoading(false);
         return;
@@ -52,14 +79,14 @@ const CourseSelection: React.FC<CourseSelectionProps> = ({ onCoursesChange }) =>
       }
     }
 
-    loadCourses();
+    loadUserSelectedCourses();
   }, [user, onCoursesChange]);
 
-  const handleCourseToggle = (course: string) => {
+  const handleCourseToggle = (courseId: string) => {
     setSelectedCourses(prev => {
-      const newSelection = prev.includes(course)
-        ? prev.filter(c => c !== course)
-        : [...prev, course];
+      const newSelection = prev.includes(courseId)
+        ? prev.filter(c => c !== courseId)
+        : [...prev, courseId];
       
       onCoursesChange?.(newSelection);
       return newSelection;
@@ -114,49 +141,95 @@ const CourseSelection: React.FC<CourseSelectionProps> = ({ onCoursesChange }) =>
     }
   };
 
-  if (loading) {
-    return <div className="course-selection">Loading courses...</div>;
+  if (loading && allCourses.length === 0) {
+    return (
+      <div className="course-selection">
+        <div className="courses-header">
+          <h2>Course Selection</h2>
+          <p className="page-description">
+            Select the courses you're currently taking to customize your study schedule.
+          </p>
+        </div>
+        <div className="loading-indicator">
+          <span className="loading-spinner"></span>
+          <span className="loading-text">Loading available courses...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="course-selection">
-      <h2>Select Your Courses</h2>
+      <div className="courses-header">
+        <h2>Course Selection</h2>
+        <p className="page-description">
+          Select the courses you're currently taking to customize your study schedule.
+        </p>
+      </div>
+      
       {message && (
         <div className={`message ${message.type}`}>
           {message.text}
         </div>
       )}
-      <div className="courses-grid">
-        {courses.map(course => (
-          <div key={course} className="course-item">
-            <label>
-              <input
-                type="checkbox"
-                checked={selectedCourses.includes(course)}
-                onChange={() => handleCourseToggle(course)}
-              />
-              {course}
-            </label>
+      
+      <div className="courses-container">
+        <div className="group-header">
+          <h3>Available Courses</h3>
+          <p className="group-description">
+            Select the courses you are currently enrolled in to generate personalized study schedules.
+          </p>
+        </div>
+        
+        {allCourses.length === 0 ? (
+          <div className="no-courses">No courses found. Please check the database.</div>
+        ) : (
+          <div className="courses-grid">
+            {allCourses.map(courseId => (
+              <div key={courseId} className="course-item">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={selectedCourses.includes(courseId)}
+                    onChange={() => handleCourseToggle(courseId)}
+                  />
+                  {courseId}
+                </label>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
       
-      <div className="selected-courses">
-        <h3>Selected Courses: {selectedCourses.length}</h3>
-        <ul>
-          {selectedCourses.map(course => (
-            <li key={course}>{course}</li>
-          ))}
-        </ul>
+      <div className="selection-container">
+        <div className="group-header">
+          <h3>Your Selection</h3>
+          <p className="group-description">
+            Review and confirm your selected courses below.
+          </p>
+        </div>
+        
+        <div className="selected-courses">
+          <h3>Selected Courses: {selectedCourses.length}</h3>
+          {selectedCourses.length > 0 ? (
+            <ul>
+              {selectedCourses.map(courseId => (
+                <li key={courseId}>{courseId}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="no-selection">You haven't selected any courses yet.</p>
+          )}
+        </div>
+        
+        <button 
+          className="save-button"
+          onClick={handleSave}
+          disabled={saving || !user}
+        >
+          {saving ? 'Saving...' : 'Save Courses'}
+        </button>
       </div>
-
-      <button 
-        className="save-button"
-        onClick={handleSave}
-        disabled={saving || !user}
-      >
-        {saving ? 'Saving...' : 'Save Courses'}
-      </button>
     </div>
   );
 };

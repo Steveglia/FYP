@@ -127,7 +127,7 @@ export const fetchEvents = async (currentWeekStart: Date): Promise<Event[]> => {
 };
 
 // Fetch lectures for the current week
-export const fetchLectures = async (currentWeekStart: Date): Promise<Event[]> => {
+export const fetchLectures = async (currentWeekStart: Date, userId?: string): Promise<Event[]> => {
   try {
     // Calculate week end date
     const weekEndDate = new Date(currentWeekStart);
@@ -137,8 +137,25 @@ export const fetchLectures = async (currentWeekStart: Date): Promise<Event[]> =>
     const startDateStr = currentWeekStart.toISOString();
     const endDateStr = weekEndDate.toISOString();
     
+    // If we have a userId, fetch their selected courses from StudyPreference
+    let userSelectedCourses: string[] = [];
+    if (userId) {
+      try {
+        const { data: preferences } = await client.models.StudyPreference.list({
+          filter: { owner: { eq: userId } }
+        });
+        
+        if (preferences.length > 0 && preferences[0].courses) {
+          userSelectedCourses = preferences[0].courses.filter((course): course is string => 
+            course !== null && course !== undefined
+          );
+        }
+      } catch (error) {
+        console.error('Error fetching user study preferences:', error);
+      }
+    }
+    
     // Query lectures for the current week
-    // This assumes there's a filter method available to filter by date range
     const result = await client.models.Lectures.list({
       filter: {
         and: [
@@ -154,6 +171,13 @@ export const fetchLectures = async (currentWeekStart: Date): Promise<Event[]> =>
       
       // Process each lecture
       for (const lecture of result.data) {
+        // Skip lectures for courses the user hasn't selected
+        if (userId && userSelectedCourses.length > 0 && lecture.courseId) {
+          if (!userSelectedCourses.includes(lecture.courseId)) {
+            continue; // Skip this lecture as it's not from a selected course
+          }
+        }
+        
         const now = new Date().toISOString();
         const isLab = lecture.title?.toLowerCase().includes('lab') || 
                      lecture.content?.toLowerCase().includes('lab') ||
@@ -256,6 +280,12 @@ export const generateStudySessions = async (
         ]
       }
     });
+
+    // Fetch accepted personal learning sessions for the current week
+    const acceptedPersonalLearningSessions = await fetchAcceptedPersonalLearningSessions(currentWeekStart, userId);
+    
+    // Fetch accepted study sessions for the current week
+    const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, userId);
     
     // Process lectures into Event format
     let dbLectures: Event[] = [];
@@ -300,9 +330,16 @@ export const generateStudySessions = async (
       }
     }
     
-    // Combine events from database with lectures
+    // Combine events from database with lectures and all accepted sessions
     const dbEvents = eventsResult.data || [];
-    const allEvents = [...dbEvents, ...dbLectures, ...currentEvents, ...currentLectures];
+    const allEvents = [
+      ...dbEvents, 
+      ...dbLectures, 
+      ...currentEvents, 
+      ...currentLectures, 
+      ...acceptedPersonalLearningSessions,
+      ...acceptedStudySessions
+    ];
     
     console.log('Total events for availability calculation:', allEvents.length);
     
@@ -626,6 +663,12 @@ export const generatePersonalLearningSlots = async (
       }
     });
     
+    // Fetch accepted study sessions for the current week
+    const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, userId);
+    
+    // Fetch accepted personal learning sessions for the current week  
+    const acceptedPersonalLearningSessions = await fetchAcceptedPersonalLearningSessions(currentWeekStart, userId);
+    
     // Process lectures into Event format
     let dbLectures: Event[] = [];
     
@@ -669,9 +712,16 @@ export const generatePersonalLearningSlots = async (
       }
     }
     
-    // Combine events from database with lectures
+    // Combine events from database with lectures and all accepted sessions
     const dbEvents = eventsResult.data || [];
-    const allEvents = [...dbEvents, ...dbLectures, ...currentEvents, ...currentLectures];
+    const allEvents = [
+      ...dbEvents, 
+      ...dbLectures, 
+      ...currentEvents, 
+      ...currentLectures, 
+      ...acceptedStudySessions,
+      ...acceptedPersonalLearningSessions
+    ];
     
     console.log('Total events for availability calculation:', allEvents.length);
     
@@ -906,72 +956,6 @@ export const generatePersonalLearningSlots = async (
   }
 };
 
-// Helper function to convert time slots to events
-function convertTimeSlotsToEvents(timeSlots: any[] | undefined, currentWeekStart: Date): Event[] {
-  if (!timeSlots || !Array.isArray(timeSlots) || timeSlots.length === 0) {
-    return [];
-  }
-  
-  // Type guard to ensure we only return valid Event objects
-  const isEvent = (obj: any): obj is Event => {
-    return obj && obj.startDate && obj.endDate && obj.title;
-  };
-  
-  const learningEvents = timeSlots.map((slot: {day: string; hour: number}) => {
-    try {
-      // Convert the day name to day index (0 for Monday, 6 for Sunday)
-      const dayIndex = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(slot.day);
-      if (dayIndex === -1) {
-        console.error('Invalid day name:', slot.day);
-        return null;
-      }
-      
-      // Create a date for the specific day and hour
-      const eventDate = new Date(currentWeekStart);
-      eventDate.setDate(currentWeekStart.getDate() + dayIndex);
-      
-      // Set the start time
-      const startDate = new Date(eventDate);
-      startDate.setHours(slot.hour, 0, 0, 0);
-      
-      // Set the end time (1 hour later)
-      const endDate = new Date(startDate);
-      endDate.setHours(startDate.getHours() + 1);
-      
-      // Generate a unique ID for this event
-      const id = `learning-${dayIndex}-${slot.hour}-${Date.now()}`;
-      
-      return {
-        id,
-        title: `Personal Learning`,
-        description: 'Allocated time for personal learning and studying',
-        type: 'LEARNING',
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-    } catch (error) {
-      console.error('Error creating learning time slot:', error);
-      return null;
-    }
-  }).filter(isEvent);
-  
-  console.log('\n===== GENERATED PERSONAL LEARNING SLOTS =====');
-  // Make sure we only log valid events with startDate and endDate
-  learningEvents.forEach((slot: any) => {
-    if (slot) {
-      console.log(`Slot:`, {
-        day: slot.startDate ? new Date(slot.startDate).toLocaleDateString('en-GB', { weekday: 'long' }) : 'Unknown',
-        startTime: slot.startDate ? new Date(slot.startDate).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'Unknown',
-        endTime: slot.endDate ? new Date(slot.endDate).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'Unknown'
-      });
-    }
-  });
-  
-  return learningEvents as Event[];
-}
-
 // Toggle the active status of a personal learning item
 export const togglePersonalLearningStatus = async (personalLearningId: string): Promise<boolean> => {
   try {
@@ -1021,5 +1005,130 @@ export const getPersonalLearningItems = async (userId: string): Promise<Schema['
   } catch (error) {
     console.error('Error fetching personal learning items:', error);
     return [];
+  }
+};
+
+// Save an accepted personal learning session to the database
+export const saveAcceptedPersonalLearningSession = async (
+  learningSession: Event, 
+  userId: string, 
+  weekStartDate: Date,
+  subject: string = "Personal Learning"
+): Promise<boolean> => {
+  try {
+    if (!learningSession || !userId || !learningSession.startDate || !learningSession.endDate || !learningSession.title) {
+      console.error('Invalid learning session or user ID');
+      return false;
+    }
+    
+    // Extract day name from the date
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const sessionDate = new Date(learningSession.startDate);
+    const day = dayNames[sessionDate.getDay()];
+    
+    // Format times
+    const startTime = `${String(sessionDate.getHours()).padStart(2, '0')}:${String(sessionDate.getMinutes()).padStart(2, '0')}`;
+    
+    const endDate = new Date(learningSession.endDate);
+    const endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+    
+    // Create the accepted personal learning session record
+    const result = await client.models.AcceptedPersonalLearningSession.create({
+      day,
+      startTime,
+      endTime,
+      subject,
+      startDate: learningSession.startDate,
+      endDate: learningSession.endDate,
+      userId,
+      weekStartDate: weekStartDate.toISOString(),
+      title: "Personal Learning",
+      description: learningSession.description || 'Self-directed learning session',
+      type: 'LEARNING'
+    });
+    
+    console.log('Personal learning session accepted and saved:', result);
+    return true;
+  } catch (error) {
+    console.error('Error saving accepted personal learning session:', error);
+    return false;
+  }
+};
+
+// Fetch accepted personal learning sessions for a specific week and user
+export const fetchAcceptedPersonalLearningSessions = async (weekStartDate: Date, userId: string): Promise<Event[]> => {
+  try {
+    const weekStartStr = weekStartDate.toISOString();
+    
+    // Calculate week end date
+    const weekEndDate = new Date(weekStartDate);
+    weekEndDate.setDate(weekStartDate.getDate() + 7);
+    
+    // Query accepted personal learning sessions for the current week and user
+    const result = await client.models.AcceptedPersonalLearningSession.list({
+      filter: {
+        and: [
+          { weekStartDate: { eq: weekStartStr } },
+          { userId: { eq: userId } }
+        ]
+      }
+    });
+    
+    if (result.data && result.data.length > 0) {
+      // Convert to Event format
+      return result.data.map(session => ({
+        id: session.id,
+        title: session.title,
+        description: session.description,
+        type: 'LEARNING',
+        startDate: session.startDate,
+        endDate: session.endDate,
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt
+      }));
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Error fetching accepted personal learning sessions:', error);
+    return [];
+  }
+};
+
+// Delete all accepted personal learning sessions for a specific week
+export const deleteAcceptedPersonalLearningSessions = async (weekStartDate: Date, userId: string): Promise<boolean> => {
+  try {
+    const weekStartStr = weekStartDate.toISOString();
+    
+    // Query accepted personal learning sessions for the current week and user
+    const result = await client.models.AcceptedPersonalLearningSession.list({
+      filter: {
+        and: [
+          { weekStartDate: { eq: weekStartStr } },
+          { userId: { eq: userId } }
+        ]
+      }
+    });
+    
+    if (result.data && result.data.length > 0) {
+      console.log(`Found ${result.data.length} accepted personal learning sessions to delete`);
+      
+      // Delete each session
+      const deletePromises = result.data.map(session => 
+        client.models.AcceptedPersonalLearningSession.delete({
+          id: session.id
+        })
+      );
+      
+      await Promise.all(deletePromises);
+      console.log(`Successfully deleted ${result.data.length} accepted personal learning sessions`);
+      return true;
+    } else {
+      console.log('No accepted personal learning sessions found to delete');
+      return false;
+    }
+  } catch (error) {
+    console.error('Error deleting accepted personal learning sessions:', error);
+    return false;
   }
 }; 

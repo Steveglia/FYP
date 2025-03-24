@@ -1,12 +1,32 @@
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { Link, useLocation, NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 
 const Navigation = () => {
   const { user, signOut } = useAuthenticator();
   const location = useLocation();
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const offset = window.scrollY;
+      if (offset > 10) {
+        setScrolled(true);
+      } else {
+        setScrolled(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    
+    // Clean up the event listener when component unmounts
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   return (
-    <nav className="navigation">
+    <nav className={`navigation ${scrolled ? 'scrolled' : ''}`}>
       <div className="nav-header">
         <h2>Welcome, {user?.signInDetails?.loginId}</h2>
       </div>

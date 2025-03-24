@@ -47,7 +47,7 @@
 
 .weekly-schedule {
   overflow-x: auto;
-  margin: 20px 0;
+  margin: 0;
   border: 2px solid #ccc;
   border-radius: 8px;
   width: 100%;
@@ -120,13 +120,22 @@
   width: 100%;
   padding: 15px 20px;
   background-color: #f8f9fa;
+  background-image: linear-gradient(to bottom, #ffffff, #f8f9fa);
   border-bottom: 1px solid #dee2e6;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  z-index: 1000;
   display: flex;
   justify-content: space-between;
   align-items: center;
   box-sizing: border-box;
+  position: fixed;
+  top: 0;
+  left: 0;
+  transition: box-shadow 0.3s ease;
+}
+
+.navigation.scrolled {
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
 }
 
 .nav-header {
@@ -167,10 +176,11 @@
 
 .main-content {
   flex: 1;
-  padding: 30px 20px 20px 20px;
+  padding: 80px 20px 20px 20px;
   overflow-x: hidden;
   width: 100%;
   box-sizing: border-box;
+  margin-top: 0;
 }
 
 .menu-grid {
@@ -282,6 +292,9 @@
   .navigation {
     flex-direction: column;
     padding: 10px;
+    width: 100%;
+    left: 0;
+    right: 0;
   }
   
   .nav-header {
@@ -293,8 +306,23 @@
     margin: 10px 0;
     overflow-x: auto;
     width: 100%;
-    justify-content: center;
+    justify-content: flex-start;
     padding-bottom: 5px;
+    display: flex;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  .nav-links::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .nav-links a {
+    padding: 8px 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   
   .sign-out-btn {
@@ -302,7 +330,7 @@
   }
   
   .main-content {
-    padding-top: 20px;
+    padding-top: 140px;
   }
   
   .menu-grid {
@@ -312,4 +340,11 @@
   .home-page {
     padding: 1rem;
   }
+}
+
+/* Add consistent background color to prevent white space during scroll bounce */
+body, html {
+  background-color: #f8f9fa;
+  min-height: 100%;
+  overflow-x: hidden;
 }

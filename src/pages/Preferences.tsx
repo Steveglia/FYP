@@ -35,7 +35,6 @@ const Preferences = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [showPersonalizeGrid, setShowPersonalizeGrid] = useState(false);
-  const [lastSelectedPreference, setLastSelectedPreference] = useState(1); // 1-based index for Morning
   const [showFillOptions, setShowFillOptions] = useState(false);
 
   useEffect(() => {
@@ -143,14 +142,6 @@ const Preferences = () => {
   const handlePreferredTimeChange = (value: "MORNING" | "AFTERNOON" | "EVENING" | "PERSONALIZE") => {
     setPreferences({ ...preferences, preferredTimeOfDay: value });
     setShowPersonalizeGrid(value === "PERSONALIZE");
-    
-    // Remember last selected non-personalized preference for the fill tool
-    if (value !== "PERSONALIZE") {
-      const index = ["MORNING", "AFTERNOON", "EVENING"].indexOf(value) + 1;
-      if (index > 0) {
-        setLastSelectedPreference(index);
-      }
-    }
   };
 
   // Fill grid with recommended values based on preferred time of day
@@ -211,16 +202,8 @@ const Preferences = () => {
   };
 
   const validatePreferences = () => {
-    if (Number(preferences.studyTime) <= 0) {
-      setMessage({ type: 'error', text: 'Study time must be greater than 0' });
-      return false;
-    }
     if (preferences.maxHoursPerDay <= 0 || preferences.maxHoursPerDay > 24) {
       setMessage({ type: 'error', text: 'Maximum hours per day must be between 1 and 24' });
-      return false;
-    }
-    if (preferences.lunchBreakDuration <= 0) {
-      setMessage({ type: 'error', text: 'Lunch break duration must be greater than 0' });
       return false;
     }
     return true;
@@ -289,199 +272,216 @@ const Preferences = () => {
   };
 
   if (!user) {
-    return <div className="preferences-page">Please log in to view and edit preferences.</div>;
+    return (
+      <div className="preferences-page">
+        <div className="preferences-header">
+          <h1>Study Preferences</h1>
+          <p className="page-description">
+            Customize your study preferences to optimize your learning schedule.
+          </p>
+        </div>
+        <div className="message error">Please log in to view and edit preferences.</div>
+      </div>
+    );
   }
 
   if (loading) {
-    return <div className="preferences-page">Loading preferences...</div>;
+    return (
+      <div className="preferences-page">
+        <div className="preferences-header">
+          <h1>Study Preferences</h1>
+          <p className="page-description">
+            Customize your study preferences to optimize your learning schedule.
+          </p>
+        </div>
+        <div className="loading-indicator">
+          <span className="loading-spinner"></span>
+          <span className="loading-text">Loading your preferences...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="preferences-page">
-      <h1>Study Preferences</h1>
+      <div className="preferences-header">
+        <h1>Study Preferences</h1>
+        <p className="page-description">
+          Customize your study preferences to optimize your learning schedule.
+        </p>
+      </div>
+      
       {message && (
         <div className={`message ${message.type}`}>
           {message.text}
         </div>
       )}
-      <form className="preferences-form" onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Daily Study Time (hours)</label>
-          <input
-            type="number"
-            min="1"
-            max="24"
-            value={preferences.studyTime}
-            onChange={(e) => setPreferences({ ...preferences, studyTime: e.target.value })}
-          />
+      
+      <div className="preferences-container">
+        <div className="group-header">
+          <h3>General Settings</h3>
+          <p className="group-description">
+            Configure your basic study preferences to customize how your study schedule is generated.
+          </p>
         </div>
-        <div className="form-group">
-          <label>Maximum Hours Per Day</label>
-          <input
-            type="number"
-            value={preferences.maxHoursPerDay}
-            onChange={(e) => setPreferences({ ...preferences, maxHoursPerDay: Number(e.target.value) })}
-          />
-        </div>
-        <div className="form-group">
-          <label>Lunch Break Start</label>
-          <input
-            type="time"
-            value={preferences.lunchBreakStart}
-            onChange={(e) => setPreferences({ ...preferences, lunchBreakStart: e.target.value })}
-          />
-        </div>
-        <div className="form-group">
-          <label>Lunch Break Duration (minutes)</label>
-          <input
-            type="number"
-            value={preferences.lunchBreakDuration}
-            onChange={(e) => setPreferences({ ...preferences, lunchBreakDuration: Number(e.target.value) })}
-          />
-        </div>
-        <div className="form-group">
-          <label>
+        
+        <form className="preferences-form" onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label>Maximum Hours Per Day</label>
             <input
-              type="checkbox"
-              checked={preferences.studyDuringWork}
-              onChange={(e) => setPreferences({ ...preferences, studyDuringWork: e.target.checked })}
+              type="number"
+              value={preferences.maxHoursPerDay}
+              onChange={(e) => setPreferences({ ...preferences, maxHoursPerDay: Number(e.target.value) })}
             />
-            Allow Study During Work Hours
-          </label>
-        </div>
-        <div className="form-group">
-          <label>Preferred Time of Day</label>
-          <select
-            value={preferences.preferredTimeOfDay}
-            onChange={(e) => handlePreferredTimeChange(e.target.value as "MORNING" | "AFTERNOON" | "EVENING" | "PERSONALIZE")}
-          >
-            <option value="MORNING">Morning</option>
-            <option value="AFTERNOON">Afternoon</option>
-            <option value="EVENING">Evening</option>
-            <option value="PERSONALIZE">Personalize</option>
-          </select>
-        </div>
+          </div>
+          <div className="form-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={preferences.studyDuringWork}
+                onChange={(e) => setPreferences({ ...preferences, studyDuringWork: e.target.checked })}
+              />
+              Allow Study During Work Hours
+            </label>
+          </div>
+          <div className="form-group">
+            <label>Preferred Time of Day</label>
+            <select
+              value={preferences.preferredTimeOfDay}
+              onChange={(e) => handlePreferredTimeChange(e.target.value as "MORNING" | "AFTERNOON" | "EVENING" | "PERSONALIZE")}
+            >
+              <option value="MORNING">Morning</option>
+              <option value="AFTERNOON">Afternoon</option>
+              <option value="EVENING">Evening</option>
+              <option value="PERSONALIZE">Personalize</option>
+            </select>
+          </div>
+          
+          <button type="submit" disabled={saving}>
+            {saving ? 'Saving...' : 'Save Preferences'}
+          </button>
+        </form>
+      </div>
 
-        {showPersonalizeGrid && (
-          <div className="preference-grid-container">
-            <h3>Customize Your Weekly Schedule Preferences</h3>
-            <p>Click on cells to cycle through preference levels. Red indicates unavailable times, while green indicates highly preferred study times.</p>
+      {showPersonalizeGrid && (
+        <div className="preference-grid-container">
+          <div className="group-header">
+            <h3>Customize Schedule</h3>
+            <p className="group-description">
+              Click on cells to cycle through preference levels. Red indicates unavailable times, while green indicates highly preferred study times.
+            </p>
+          </div>
 
-            <div className="preference-grid">
-              <div className="day-labels">
-                <div className="corner-cell"></div>
-                {DAYS.map((day, i) => (
-                  <div key={`day-${i}`} className="day-label">{day}</div>
-                ))}
+          <div className="preference-grid">
+            <div className="day-labels">
+              <div className="corner-cell"></div>
+              {DAYS.map((day, i) => (
+                <div key={`day-${i}`} className="day-label">{day}</div>
+              ))}
+            </div>
+
+            {HOURS.map((hour, hourIndex) => (
+              <div key={`hour-${hourIndex}`} className="hour-row">
+                <div className="hour-label">{hour}</div>
+                {DAYS.map((_, dayIndex) => {
+                  const cellIndex = (dayIndex * 15) + hourIndex;
+                  const preferenceValue = preferences.personalizedVector[cellIndex];
+                  return (
+                    <div
+                      key={`cell-${cellIndex}`}
+                      className="preference-cell"
+                      style={{ backgroundColor: PREFERENCE_COLORS[preferenceValue as keyof typeof PREFERENCE_COLORS] }}
+                      onClick={() => handleCellToggle(cellIndex)}
+                    >
+                    </div>
+                  );
+                })}
               </div>
+            ))}
+          </div>
 
-              {HOURS.map((hour, hourIndex) => (
-                <div key={`hour-${hourIndex}`} className="hour-row">
-                  <div className="hour-label">{hour}</div>
-                  {DAYS.map((_, dayIndex) => {
-                    const cellIndex = (dayIndex * 15) + hourIndex;
-                    const preferenceValue = preferences.personalizedVector[cellIndex];
-                    return (
-                      <div
-                        key={`cell-${cellIndex}`}
-                        className="preference-cell"
-                        style={{ backgroundColor: PREFERENCE_COLORS[preferenceValue as keyof typeof PREFERENCE_COLORS] }}
-                        onClick={() => handleCellToggle(cellIndex)}
-                      >
-                      </div>
-                    );
-                  })}
+          <div className="preference-legend">
+            <div className="legend-title">Preference Levels:</div>
+            {PREFERENCE_VALUES.map(value => (
+              <div key={`legend-${value}`} className="legend-item">
+                <div 
+                  className="legend-color" 
+                  style={{ backgroundColor: PREFERENCE_COLORS[value as keyof typeof PREFERENCE_COLORS] }}
+                ></div>
+                <div className="legend-label">
+                  {value === 0 ? 'Unavailable (0)' :
+                   value === 2 ? 'Low Preference (2)' :
+                   value === 4 ? 'Neutral (4)' :
+                   value === 6 ? 'Preferred (6)' :
+                   'Highly Preferred (9)'}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
+          </div>
 
-            <div className="preference-legend">
-              <div className="legend-title">Preference Levels:</div>
-              {PREFERENCE_VALUES.map(value => (
-                <div key={`legend-${value}`} className="legend-item">
-                  <div 
-                    className="legend-color" 
-                    style={{ backgroundColor: PREFERENCE_COLORS[value as keyof typeof PREFERENCE_COLORS] }}
-                  ></div>
-                  <div className="legend-label">
-                    {value === 0 ? 'Unavailable (0)' :
-                     value === 2 ? 'Low Preference (2)' :
-                     value === 4 ? 'Neutral (4)' :
-                     value === 6 ? 'Preferred (6)' :
-                     'Highly Preferred (9)'}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="reset-container">
+          <div className="reset-container">
+            <button 
+              type="button" 
+              onClick={handleResetPersonalizedPreferences}
+              className="reset-button"
+            >
+              Reset All to Neutral
+            </button>
+            <div className="fill-dropdown-container">
               <button 
                 type="button" 
-                onClick={handleResetPersonalizedPreferences}
-                className="reset-button"
+                onClick={() => setShowFillOptions(!showFillOptions)}
+                className="fill-button"
               >
-                Reset All to Neutral
+                Fill with Recommendations
               </button>
-              <div className="fill-dropdown-container">
-                <button 
-                  type="button" 
-                  onClick={() => setShowFillOptions(!showFillOptions)}
-                  className="fill-button"
-                >
-                  Fill with Recommendations
-                </button>
-                {showFillOptions && (
-                  <>
-                    <div className="overlay" onClick={() => setShowFillOptions(false)}></div>
-                    <div className="fill-dropdown-menu">
-                      <div 
-                        className="fill-dropdown-item" 
-                        onClick={() => handleFillWithRecommendations('MORNING')}
-                      >
-                        <div className="preference-pattern">
-                          <span className="pattern-indicator high"></span>
-                          <span className="pattern-indicator medium"></span>
-                          <span className="pattern-indicator low"></span>
-                          <span className="pattern-indicator very-low"></span>
-                        </div>
-                        <span>Morning Preference</span>
+              {showFillOptions && (
+                <>
+                  <div className="overlay" onClick={() => setShowFillOptions(false)}></div>
+                  <div className="fill-dropdown-menu">
+                    <div 
+                      className="fill-dropdown-item" 
+                      onClick={() => handleFillWithRecommendations('MORNING')}
+                    >
+                      <div className="preference-pattern">
+                        <span className="pattern-indicator high"></span>
+                        <span className="pattern-indicator medium"></span>
+                        <span className="pattern-indicator low"></span>
+                        <span className="pattern-indicator very-low"></span>
                       </div>
-                      <div 
-                        className="fill-dropdown-item" 
-                        onClick={() => handleFillWithRecommendations('AFTERNOON')}
-                      >
-                        <div className="preference-pattern">
-                          <span className="pattern-indicator low"></span>
-                          <span className="pattern-indicator medium"></span>
-                          <span className="pattern-indicator high"></span>
-                          <span className="pattern-indicator low"></span>
-                        </div>
-                        <span>Afternoon Preference</span>
-                      </div>
-                      <div 
-                        className="fill-dropdown-item" 
-                        onClick={() => handleFillWithRecommendations('EVENING')}
-                      >
-                        <div className="preference-pattern">
-                          <span className="pattern-indicator very-low"></span>
-                          <span className="pattern-indicator low"></span>
-                          <span className="pattern-indicator medium"></span>
-                          <span className="pattern-indicator high"></span>
-                        </div>
-                        <span>Evening Preference</span>
-                      </div>
+                      <span>Morning Preference</span>
                     </div>
-                  </>
-                )}
-              </div>
+                    <div 
+                      className="fill-dropdown-item" 
+                      onClick={() => handleFillWithRecommendations('AFTERNOON')}
+                    >
+                      <div className="preference-pattern">
+                        <span className="pattern-indicator low"></span>
+                        <span className="pattern-indicator medium"></span>
+                        <span className="pattern-indicator high"></span>
+                        <span className="pattern-indicator low"></span>
+                      </div>
+                      <span>Afternoon Preference</span>
+                    </div>
+                    <div 
+                      className="fill-dropdown-item" 
+                      onClick={() => handleFillWithRecommendations('EVENING')}
+                    >
+                      <div className="preference-pattern">
+                        <span className="pattern-indicator very-low"></span>
+                        <span className="pattern-indicator low"></span>
+                        <span className="pattern-indicator medium"></span>
+                        <span className="pattern-indicator high"></span>
+                      </div>
+                      <span>Evening Preference</span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
-        )}
-
-        <button type="submit" disabled={saving}>
-          {saving ? 'Saving...' : 'Save Preferences'}
-        </button>
-      </form>
+        </div>
+      )}
     </div>
   );
 };

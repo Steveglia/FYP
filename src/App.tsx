@@ -25,10 +25,10 @@ async function initializeStudyPreference(userId: string) {
 
     if (existingPrefs.data.length === 0) {
       await client.models.StudyPreference.create({
-        studyTime: "4",
+        studyTime: "4",           // No longer used in UI, kept for compatibility
         maxHoursPerDay: 8,
-        lunchBreakStart: "12:00",
-        lunchBreakDuration: 60,
+        lunchBreakStart: "12:00", // No longer used in UI, kept for compatibility
+        lunchBreakDuration: 60,   // No longer used in UI, kept for compatibility
         studyDuringWork: false,
         preferredTimeOfDay: "MORNING",
         owner: userId

@@ -1,42 +1,73 @@
 .preferences-page {
-  max-width: 800px;
+  padding: 2rem 1.5rem;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 20px;
+  margin-top: 2rem;
+  box-sizing: border-box;
 }
 
-.preferences-form {
-  background-color: #fff;
-  padding: 20px;
+.preferences-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding: 1.5rem;
+  background-color: #f8f9fa;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  position: relative;
 }
 
-.form-group {
-  margin-bottom: 15px;
+.preferences-header h1 {
+  margin: 0;
+  color: #333;
+  font-size: 1.75rem;
+  line-height: 1.2;
 }
 
-.form-group label {
-  display: block;
-  margin-bottom: 5px;
-  font-weight: 500;
+.page-description {
+  margin: 0;
+  color: #666;
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
-.form-group input[type="checkbox"] {
-  margin-right: 8px;
+/* Loading indicator */
+.loading-spinner {
+  width: 24px !important;
+  height: 24px !important;
+  border: 3px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 50% !important;
+  border-top-color: #007bff !important;
+  animation: spin 1s ease-in-out infinite !important;
+  margin-right: 10px !important;
+  display: inline-block !important;
 }
 
-.form-group input, .form-group select {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 16px;
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 14px !important;
+  color: #666 !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+}
+
+.loading-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  font-size: 18px;
+  color: #666;
 }
 
 .message {
-  padding: 10px 15px;
-  margin-bottom: 20px;
+  padding: 1rem;
   border-radius: 4px;
+  margin-bottom: 1.5rem;
 }
 
 .message.success {
@@ -51,66 +82,149 @@
   border: 1px solid #f5c6cb;
 }
 
-button[type="submit"] {
-  background-color: #4285f4;
+.preferences-container {
+  margin: 20px 0 25px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  background-color: #fff;
+}
+
+.group-header {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+  padding: 15px 20px;
+  border-bottom: 1px solid #eaeaea;
+  background-color: #f5f8ff;
+}
+
+.group-header h3 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 18px;
+  color: #2c5282;
+  text-align: left;
+}
+
+.group-description {
+  margin: 0;
+  color: #4a5568;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.preferences-form {
+  padding: 1.5rem;
+  background-color: white;
+  border-radius: 0;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.form-group label input[type="checkbox"] {
+  margin-right: 0.75rem;
+  width: 18px;
+  height: 18px;
+}
+
+.form-group input[type="number"],
+.form-group input[type="text"],
+.form-group select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  background-color: #f9f9f9;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input[type="number"]:focus,
+.form-group input[type="text"]:focus,
+.form-group select:focus {
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+  outline: none;
+}
+
+/* Save button */
+.preferences-form button[type="submit"] {
+  display: block;
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #4caf50;
   color: white;
-  padding: 10px 16px;
   border: none;
   border-radius: 4px;
-  font-size: 16px;
+  font-size: 1rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-button[type="submit"]:hover {
-  background-color: #3367d6;
-}
-
-button[type="submit"]:disabled {
-  background-color: #a0b5e0;
-  cursor: not-allowed;
-}
-
-/* Preference Grid Styles */
-.preference-grid-container {
-  margin: 20px 0;
-  padding: 15px;
-  background-color: #f9f9f9;
-  border-radius: 8px;
+  transition: background-color 0.3s, transform 0.1s;
+  margin-top: 1.5rem;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.preference-grid-container h3 {
-  margin-top: 0;
-  margin-bottom: 10px;
+.preferences-form button[type="submit"]:hover:not(:disabled) {
+  background-color: #45a049;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
-.preference-grid-container p {
-  margin-bottom: 15px;
-  font-size: 14px;
-  color: #666;
+.preferences-form button[type="submit"]:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.preferences-form button[type="submit"]:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Preference grid styles */
+.preference-grid-container {
+  margin: 20px 0 25px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  background-color: #fff;
 }
 
 .preference-grid {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 20px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 20px;
+  background-color: white;
   overflow-x: auto;
   width: 100%;
+  max-width: 100%;
 }
 
+/* Improve grid styling */
 .day-labels {
   display: flex;
-  background-color: #f0f0f0;
+  background-color: #f5f8ff;
   border-bottom: 1px solid #ddd;
+  width: fit-content;
+  min-width: 100%;
 }
 
 .corner-cell {
   width: 60px;
   min-width: 60px;
-  background-color: #e4e4e4;
+  background-color: #e4e9f7;
   border-right: 1px solid #ddd;
 }
 
@@ -121,21 +235,13 @@ button[type="submit"]:disabled {
   font-size: 12px;
   font-weight: bold;
   min-width: 40px;
-  background-color: #f0f0f0;
+  background-color: #f5f8ff;
   border-right: 1px solid #ddd;
+  color: #2c5282;
 }
 
 .day-label:last-child {
   border-right: none;
-}
-
-.hour-row {
-  display: flex;
-  border-bottom: 1px solid #eee;
-}
-
-.hour-row:last-child {
-  border-bottom: none;
 }
 
 .hour-label {
@@ -144,11 +250,23 @@ button[type="submit"]:disabled {
   padding: 8px 4px;
   text-align: center;
   font-weight: bold;
-  background-color: #f0f0f0;
+  background-color: #f5f8ff;
   border-right: 1px solid #ddd;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #2c5282;
+}
+
+.hour-row {
+  display: flex;
+  border-bottom: 1px solid #eee;
+  width: fit-content;
+  min-width: 100%;
+}
+
+.hour-row:last-child {
+  border-bottom: none;
 }
 
 .preference-cell {
@@ -187,23 +305,48 @@ button[type="submit"]:disabled {
   border-right: none;
 }
 
+/* Legend styles */
 .preference-legend {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  margin-top: 15px;
-  background-color: white;
-  padding: 10px;
-  border-radius: 4px;
-  border: 1px solid #eee;
+  gap: 15px;
+  padding: 15px 20px;
+  background-color: #f5f8ff;
+  border-top: 1px solid #eaeaea;
 }
 
-.reset-container {
-  margin-top: 15px;
+.legend-title {
+  font-weight: 600;
+  margin-right: 15px;
+  color: #2c5282;
+}
+
+.legend-item {
   display: flex;
-  justify-content: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  align-items: center;
+  margin-right: 15px;
+  margin-bottom: 5px;
+}
+
+.legend-color {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  margin-right: 5px;
+}
+
+.legend-label {
+  font-size: 12px;
+  color: #555;
+}
+
+/* Reset container */
+.reset-container {
+  display: flex;
+  justify-content: space-between;
+  padding: 15px 20px;
+  background-color: #f8f9fa;
+  border-top: 1px solid #eaeaea;
 }
 
 .reset-button, .fill-button {
@@ -259,65 +402,7 @@ button[type="submit"]:disabled {
   font-size: 16px;
 }
 
-.legend-title {
-  font-weight: bold;
-  margin-right: 15px;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  margin-right: 15px;
-  margin-bottom: 5px;
-}
-
-.legend-color {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  margin-right: 5px;
-}
-
-.legend-label {
-  font-size: 12px;
-}
-
-@media (max-width: 768px) {
-  .preference-grid-container {
-    padding: 10px;
-  }
-  
-  .hour-label {
-    width: 50px;
-    min-width: 50px;
-    font-size: 11px;
-  }
-  
-  .day-label {
-    font-size: 11px;
-    padding: 6px 2px;
-  }
-  
-  .preference-cell {
-    min-width: 30px;
-    height: 30px;
-  }
-  
-  .legend-item {
-    margin-right: 8px;
-    margin-bottom: 8px;
-  }
-  
-  .legend-color {
-    width: 16px;
-    height: 16px;
-  }
-  
-  .legend-label {
-    font-size: 10px;
-  }
-}
-
+/* Dropdown menu */
 .fill-dropdown-container {
   position: relative;
 }
@@ -325,8 +410,8 @@ button[type="submit"]:disabled {
 .fill-dropdown-menu {
   position: absolute;
   top: 100%;
-  left: 0;
   right: 0;
+  width: 240px;
   background-color: white;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
@@ -392,4 +477,109 @@ button[type="submit"]:disabled {
   right: 0;
   bottom: 0;
   z-index: 9;
+}
+
+/* Responsive adjustments */
+@media (min-width: 768px) {
+  .preferences-header {
+    flex-direction: row;
+    align-items: center;
+  }
+  
+  .preferences-header h1 {
+    font-size: 2rem;
+    min-width: 200px;
+  }
+  
+  .page-description {
+    flex-grow: 1;
+    margin: 0 1.5rem;
+  }
+  
+  .group-header {
+    flex-direction: row;
+    align-items: center;
+  }
+  
+  .group-header h3 {
+    margin-bottom: 0;
+    min-width: 150px;
+  }
+  
+  .group-description {
+    flex-grow: 1;
+    margin: 0 0 0 15px;
+  }
+}
+
+/* Improve mobile responsiveness */
+@media (max-width: 767px) {
+  .preferences-page {
+    padding: 1rem;
+    margin-top: 0.5rem;
+  }
+  
+  .preferences-header {
+    padding: 1rem;
+  }
+  
+  .group-header {
+    padding: 12px 15px;
+  }
+  
+  .preferences-form, .preference-grid {
+    padding: 15px;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-group input[type="number"],
+  .form-group input[type="text"],
+  .form-group select {
+    padding: 12px;
+    font-size: 16px; /* Better for mobile touch targets */
+  }
+  
+  .preferences-form button[type="submit"] {
+    padding: 12px;
+    font-size: 16px;
+  }
+  
+  .hour-label {
+    width: 50px;
+    min-width: 50px;
+    font-size: 11px;
+  }
+  
+  .day-label {
+    font-size: 11px;
+    padding: 6px 2px;
+  }
+  
+  .preference-cell {
+    min-width: 30px;
+    height: 30px;
+  }
+  
+  .reset-container {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .reset-button, .fill-button {
+    width: 100%;
+  }
+  
+  .fill-dropdown-menu {
+    width: 100%;
+  }
+}
+
+/* For checkbox labels specifically */
+.checkbox-label {
+  display: flex !important;
+  align-items: center !important;
+  margin-bottom: 0 !important;
 } 

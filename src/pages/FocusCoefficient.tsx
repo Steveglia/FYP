@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import React, { Component, ReactNode, ErrorInfo } from 'react';
+import { Component, ReactNode, ErrorInfo } from 'react';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../amplify/data/resource';
@@ -265,11 +265,11 @@ const FocusCoefficient = () => {
   // Function to update the heatmap based on values
   const updateHeatmap = () => {
     const newHeatmap = focusVector.map(value => {
-      // Generate color based on value (red for low, green for high)
-      if (value < 0.7) return 'very-low-focus';
-      if (value < 0.9) return 'low-focus';
-      if (value > 1.3) return 'very-high-focus';
-      if (value > 1.1) return 'high-focus';
+      // More precise mapping of values to CSS classes
+      if (value <= 0.7) return 'very-low-focus';
+      if (value <= 0.9) return 'low-focus';
+      if (value >= 1.3) return 'very-high-focus';
+      if (value >= 1.1) return 'high-focus';
       return 'neutral-focus'; // For values around 1.0
     });
     
@@ -370,13 +370,13 @@ const FocusCoefficient = () => {
   };
   
   return (
-    <div className="focus-coefficient-container">
+    <div className="focus-coefficient-page">
       <h1>Focus Coefficient Settings</h1>
       
       {isLoading ? (
-        <div className="loading">Loading focus coefficient data...</div>
+        <div className="focus-loading">Loading focus coefficient data...</div>
       ) : error ? (
-        <div className="error">
+        <div className="focus-error">
           <p>Error: {error}</p>
           <button onClick={() => window.location.reload()}>Retry</button>
         </div>
@@ -392,43 +392,32 @@ const FocusCoefficient = () => {
                 />
                 Use focus coefficients for study scheduling
               </label>
-              {recordId && (
-                <div className="record-info">
-                  <small>Record ID: {recordId}</small>
-                </div>
-              )}
-              {user && (
-                <div className="user-info">
-                  <small>User ID: {user.username}</small>
-                </div>
-              )}
             </div>
             
-            <div className="focus-actions">
+            <div className="focus-buttons">
               <button
-                className="save-button"
                 onClick={saveFocusCoefficient}
                 disabled={isSaving}
               >
                 {isSaving ? 'Saving...' : 'Save Settings'}
               </button>
               <button
-                className="reset-button"
                 onClick={resetFocusCoefficient}
                 disabled={isSaving}
               >
                 Reset to Default
               </button>
             </div>
+            
+            {savedMessage && (
+              <div className="saved-message">
+                {savedMessage}
+              </div>
+            )}
           </div>
           
-          {savedMessage && (
-            <div className="saved-message">
-              {savedMessage}
-            </div>
-          )}
-          
-          <div className="focus-help">
+          <div className="focus-explanation">
+            <h3>How to Use Focus Coefficients</h3>
             <p>
               Adjust your focus levels for different times of the week. 
               Values higher than 1.0 indicate higher focus, while values lower than 1.0 indicate lower focus.
@@ -437,48 +426,67 @@ const FocusCoefficient = () => {
               <strong>Click on a cell</strong> to cycle through focus levels: 
               0.7 (very low) → 0.9 (low) → 1.0 (neutral) → 1.1 (high) → 1.3 (very high)
             </p>
-          </div>
-          
-          <div className="data-status">
-            <p>
-              {recordId 
-                ? `Using existing focus coefficient record (ID: ${recordId.substring(0, 8)}...)`
-                : 'No existing focus coefficient record found. Save to create a new one.'}
-            </p>
-            <p>
-              Focus coefficient feature is currently: <strong>{useFocusCoefficient ? 'ENABLED' : 'DISABLED'}</strong>
+            
+            <div className="focus-legend">
+              <div className="legend-item">
+                <div className="legend-color very-low-focus"></div>
+                <span>Very Low (0.7)</span>
+              </div>
+              <div className="legend-item">
+                <div className="legend-color low-focus"></div>
+                <span>Low (0.9)</span>
+              </div>
+              <div className="legend-item">
+                <div className="legend-color neutral-focus"></div>
+                <span>Neutral (1.0)</span>
+              </div>
+              <div className="legend-item">
+                <div className="legend-color high-focus"></div>
+                <span>High (1.1)</span>
+              </div>
+              <div className="legend-item">
+                <div className="legend-color very-high-focus"></div>
+                <span>Very High (1.3)</span>
+              </div>
+            </div>
+            
+            <p className="instructions">
+              Click on cells to adjust your focus level for each hour of the day.
             </p>
           </div>
           
           <div className="focus-grid-container">
-            <div className="focus-grid">
-              <div className="focus-grid-header">
-                <div className="focus-grid-time-header"></div>
-                {hours.map((hour) => (
-                  <div key={`hour-${hour}`} className="focus-grid-time">
-                    {formatHour(hour)}
+            <div className="focus-grid-title">Weekly Focus Schedule</div>
+            <div className="focus-grid-wrapper">
+              <div className="focus-grid">
+                <div className="focus-grid-header">
+                  <div className="focus-grid-time-header"></div>
+                  {hours.map((hour) => (
+                    <div key={`hour-${hour}`} className="focus-grid-time">
+                      {formatHour(hour)}
+                    </div>
+                  ))}
+                </div>
+                
+                {weekDays.map((day, dayIndex) => (
+                  <div key={`day-${day}`} className="focus-grid-row">
+                    <div className="focus-grid-day">{day}</div>
+                    {hours.map((_, hourIndex) => {
+                      const cellIndex = getCellIndex(dayIndex, hourIndex);
+                      const cellValue = focusVector[cellIndex] || 1.0; // Fallback if undefined
+                      return (
+                        <div
+                          key={`cell-${dayIndex}-${hourIndex}`}
+                          className={`focus-grid-cell ${vectorHeatmap[cellIndex] || 'neutral-focus'}`}
+                          onClick={() => handleCellClick(dayIndex, hourIndex)}
+                        >
+                          {typeof cellValue === 'number' ? cellValue.toFixed(1) : '1.0'}
+                        </div>
+                      );
+                    })}
                   </div>
                 ))}
               </div>
-              
-              {weekDays.map((day, dayIndex) => (
-                <div key={`day-${day}`} className="focus-grid-row">
-                  <div className="focus-grid-day">{day}</div>
-                  {hours.map((_, hourIndex) => {
-                    const cellIndex = getCellIndex(dayIndex, hourIndex);
-                    const cellValue = focusVector[cellIndex] || 1.0; // Fallback if undefined
-                    return (
-                      <div
-                        key={`cell-${dayIndex}-${hourIndex}`}
-                        className={`focus-grid-cell ${vectorHeatmap[cellIndex] || 'neutral-focus'}`}
-                        onClick={() => handleCellClick(dayIndex, hourIndex)}
-                      >
-                        {typeof cellValue === 'number' ? cellValue.toFixed(1) : '1.0'}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
             </div>
           </div>
         </>

@@ -1,7 +1,13 @@
 .focus-coefficient-page {
-  max-width: 1200px;
-  margin: 0 auto;
+  margin-top: 0;
+  margin-bottom: 2rem;
   padding: 20px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
@@ -20,6 +26,9 @@
   background-color: #f8f9fa;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-height: 120px;
+  position: relative;
+  padding-top: 15px;
 }
 
 .focus-toggle {
@@ -49,36 +58,39 @@
 }
 
 .focus-buttons button {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  background-color: #3498db;
-  color: white;
-  font-weight: 600;
+  padding: 0.5rem 1rem !important;
+  border: none !important;
+  border-radius: 4px !important;
+  color: white !important;
+  font-weight: 500 !important;
+  transition: background-color 0.3s !important;
   cursor: pointer;
-  transition: background-color 0.2s;
 }
 
-.focus-buttons button:hover {
-  background-color: #2980b9;
+.focus-buttons button:first-child {
+  background-color: #007bff !important;
+}
+
+.focus-buttons button:first-child:hover {
+  background-color: #0056b3 !important;
+}
+
+.focus-buttons button:last-child {
+  background-color: #dc3545 !important;
+}
+
+.focus-buttons button:last-child:hover {
+  background-color: #c82333 !important;
 }
 
 .focus-buttons button:disabled {
-  background-color: #95a5a6;
+  background-color: #95a5a6 !important;
   cursor: not-allowed;
-}
-
-.focus-buttons button:nth-child(2) {
-  background-color: #e74c3c;
-}
-
-.focus-buttons button:nth-child(2):hover {
-  background-color: #c0392b;
 }
 
 .saved-message {
   padding: 10px 20px;
-  background-color: #2ecc71;
+  background-color: #4caf50;
   color: white;
   border-radius: 5px;
   text-align: center;
@@ -114,6 +126,10 @@
   gap: 15px;
   margin: 20px 0;
   justify-content: center;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .legend-item {
@@ -153,6 +169,8 @@
   font-style: italic;
   text-align: center;
   margin-top: 20px;
+  font-size: 14px;
+  color: #666;
 }
 
 .focus-error {
@@ -172,8 +190,33 @@
 }
 
 .focus-grid-container {
-  overflow-x: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   margin-bottom: 30px;
+  overflow: visible;
+}
+
+.focus-grid-title {
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: #2c3e50;
+  margin-bottom: 15px;
+  text-align: center;
+  background-color: #f8f9fa;
+  padding: 10px 20px;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  width: fit-content;
+}
+
+.focus-grid-wrapper {
+  overflow-x: auto;
+  max-width: 100%;
+  padding: 10px 0;
+  border-radius: 8px;
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .focus-grid {
@@ -182,12 +225,16 @@
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  max-width: 1100px;
+  margin: 0 auto;
+  border: 1px solid #ddd;
 }
 
 .focus-grid-header {
   display: flex;
-  background-color: #34495e;
-  color: white;
+  background-color: #f5f5f5;
+  color: #333;
+  border-bottom: 1px solid #ddd;
 }
 
 .focus-grid-time-header {
@@ -195,6 +242,7 @@
   padding: 10px;
   text-align: center;
   font-weight: bold;
+  border-right: 1px solid #ddd;
 }
 
 .focus-grid-time {
@@ -216,7 +264,7 @@
 .focus-grid-day {
   width: 100px;
   padding: 10px;
-  background-color: #ecf0f1;
+  background-color: #f9f9f9;
   font-weight: bold;
   text-align: center;
   border-right: 1px solid #ddd;
@@ -224,17 +272,17 @@
 
 .focus-grid-cell {
   width: 60px;
-  height: 40px;
+  height: 45px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform 0.1s;
+  transition: transform 0.1s, box-shadow 0.3s;
   border-right: 1px solid #ecf0f1;
 }
 
 .focus-grid-cell:hover {
-  transform: scale(1.1);
+  transform: scale(1.05);
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
   z-index: 1;
 }
@@ -248,7 +296,7 @@
 }
 
 .focus-grid-cell.neutral-focus {
-  background-color: rgba(241, 196, 15, 0.1);
+  background-color: rgba(241, 196, 15, 0.2);
 }
 
 .focus-grid-cell.high-focus {
@@ -256,21 +304,52 @@
 }
 
 .focus-grid-cell.very-high-focus {
-  background-color: rgba(39, 174, 96, 0.3);
+  background-color: rgba(39, 174, 96, 0.2);
 }
 
-/* Responsive adjustments */
+/* Responsive styles */
 @media (max-width: 768px) {
+  .focus-coefficient-page {
+    padding: 10px;
+  }
+  
   .focus-controls {
     padding: 15px;
   }
   
   .focus-buttons {
     flex-direction: column;
+    width: 100%;
+  }
+  
+  .focus-buttons button {
+    width: 100%;
+    margin-bottom: 10px;
   }
   
   .focus-legend {
     flex-direction: column;
     align-items: flex-start;
+  }
+  
+  .legend-item {
+    margin-bottom: 5px;
+  }
+  
+  .focus-grid-wrapper {
+    padding: 0;
+    box-shadow: none;
+    margin: 0 -10px;
+  }
+  
+  .focus-grid {
+    min-width: 100%;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  
+  .focus-grid-title {
+    width: 90%;
+    padding: 8px;
   }
 } 

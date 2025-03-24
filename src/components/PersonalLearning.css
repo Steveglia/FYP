@@ -1,7 +1,35 @@
 .personal-learning {
-  max-width: 1200px;
+  padding: 2rem 1.5rem;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 2rem;
+  margin-top: 2rem;
+  box-sizing: border-box;
+}
+
+.personal-learning-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding: 1.5rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  position: relative;
+}
+
+.personal-learning-header h2 {
+  margin: 0;
+  color: #333;
+  font-size: 1.75rem;
+  line-height: 1.2;
+}
+
+.page-description {
+  margin: 0;
+  color: #666;
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 .message {
@@ -22,13 +50,77 @@
   border: 1px solid #f5c6cb;
 }
 
+/* Loading indicator */
+.loading-spinner {
+  width: 24px !important;
+  height: 24px !important;
+  border: 3px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 50% !important;
+  border-top-color: #007bff !important;
+  animation: spin 1s ease-in-out infinite !important;
+  margin-right: 10px !important;
+  display: inline-block !important;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 14px !important;
+  color: #666 !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+}
+
+.loading-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  font-size: 18px;
+  color: #666;
+}
+
+/* Group header styles matching ReviewSessions */
+.group-header {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+  padding: 15px 20px;
+  border-bottom: 1px solid #eaeaea;
+  background-color: #f5f8ff;
+}
+
+.group-header h3 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 18px;
+  color: #2c5282;
+  text-align: left;
+}
+
+.group-description {
+  margin: 0;
+  color: #4a5568;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
 /* Learning summary section */
+.learning-container {
+  margin: 20px 0 25px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
 .learning-summary {
   background-color: #f8f9fa;
   padding: 1.5rem;
-  border-radius: 8px;
-  margin-bottom: 2rem;
-  border-left: 4px solid #4caf50;
+  border-radius: 0;
+  margin-bottom: 0;
 }
 
 .total-weekly-hours h3 {
@@ -49,7 +141,11 @@
 
 /* Learning items section */
 .learning-items {
-  margin-top: 1.5rem;
+  margin: 20px 0 25px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
 }
 
 .no-items {
@@ -57,14 +153,16 @@
   color: #6c757d;
   padding: 2rem;
   background-color: #f8f9fa;
-  border-radius: 8px;
+  border-radius: 0;
 }
 
 .items-list {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  margin-top: 1.5rem;
+  margin-top: 0;
+  padding: 1.5rem;
+  background-color: #fafafa;
 }
 
 .learning-item {
@@ -360,4 +458,52 @@ input:checked + .toggle-slider:before {
 
 .learning-item.inactive .toggle-label {
   color: #6c757d;
+}
+
+/* Responsive adjustments */
+@media (min-width: 768px) {
+  .personal-learning-header {
+    flex-direction: row;
+    align-items: center;
+  }
+  
+  .personal-learning-header h2 {
+    font-size: 2rem;
+    min-width: 200px;
+  }
+  
+  .page-description {
+    flex-grow: 1;
+    margin: 0 1.5rem;
+  }
+  
+  .group-header {
+    flex-direction: row;
+    align-items: center;
+  }
+  
+  .group-header h3 {
+    margin-bottom: 0;
+    min-width: 150px;
+  }
+  
+  .group-description {
+    flex-grow: 1;
+    margin: 0 0 0 15px;
+  }
+}
+
+@media (max-width: 767px) {
+  .personal-learning {
+    padding: 1rem;
+    margin-top: 0.5rem;
+  }
+  
+  .personal-learning-header {
+    padding: 1rem;
+  }
+  
+  .group-header {
+    padding: 12px 15px;
+  }
 } 

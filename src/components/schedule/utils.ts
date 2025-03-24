@@ -39,6 +39,27 @@ export const getEventColor = (event: ScheduleEvent): string => {
     return eventTypeColors.LECTURE;
   }
   
+  // Check for work or leisure related events by title or description
+  if (event.title) {
+    const lowercaseTitle = event.title.toLowerCase();
+    if (lowercaseTitle.includes('work') || 
+        lowercaseTitle.includes('job') || 
+        lowercaseTitle.includes('leisure') ||
+        lowercaseTitle.includes('career')) {
+      return eventTypeColors.WORK;
+    }
+  }
+  
+  if (event.description) {
+    const lowercaseDesc = event.description.toLowerCase();
+    if (lowercaseDesc.includes('work') || 
+        lowercaseDesc.includes('job') || 
+        lowercaseDesc.includes('leisure') ||
+        lowercaseDesc.includes('career')) {
+      return eventTypeColors.WORK;
+    }
+  }
+  
   // Otherwise use the regular type-based coloring with safe conversion
   const eventType = ensureValidEventType(event.type) as keyof typeof eventTypeColors;
   return eventTypeColors[eventType] || eventTypeColors.default;

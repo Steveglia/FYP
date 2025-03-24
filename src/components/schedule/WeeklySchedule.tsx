@@ -10,7 +10,10 @@ import {
   fetchAcceptedStudySessions,
   deleteAcceptedStudySessions,
   generatePersonalLearningSlots,
-  getPersonalLearningItems
+  getPersonalLearningItems,
+  saveAcceptedPersonalLearningSession,
+  fetchAcceptedPersonalLearningSessions,
+  deleteAcceptedPersonalLearningSessions
 } from './scheduleService';
 import ScheduleNavigation from './ScheduleNavigation';
 import ScheduleGrid from './ScheduleGrid';
@@ -41,8 +44,9 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
   // Add state for lectures
   const [lectures, setLectures] = useState<Event[]>([]);
   
-  // Add state for loading (only used for study session generation now)
-  const [isLoading, setIsLoading] = useState(false);
+  // Add separate loading states for study sessions and personal learning
+  const [isStudySessionLoading, setIsStudySessionLoading] = useState(false);
+  const [isPersonalLearningLoading, setIsPersonalLearningLoading] = useState(false);
   
   // Add state to track the type of loading operation
   const [loadingType, setLoadingType] = useState<'generate' | 'accept' | 'regenerate' | null>(null);
@@ -62,6 +66,9 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
   
   // Add state for personal learning slots
   const [personalLearningSlots, setPersonalLearningSlots] = useState<Event[]>([]);
+  
+  // Add state to track if there are accepted personal learning sessions for the current week
+  const [hasAcceptedPersonalLearning, setHasAcceptedPersonalLearning] = useState(false);
   
   // Initialize with initial events
   useEffect(() => {
@@ -85,6 +92,11 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
       // No loading indicator for week changes
       setError(null);
       
+      // Clear generated content when changing weeks (to avoid multiple state updates in the effect)
+      // We do this outside of the async operation to avoid race conditions
+      setPersonalLearningSlots([]);
+      setGeneratedStudySessions([]);
+      
       try {
         // Fetch events for the current week
         const currentUserId = user?.username || userId;
@@ -94,31 +106,36 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
         // Fetch accepted study sessions for the current week
         const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, currentUserId);
         
+        // Fetch accepted personal learning sessions for the current week
+        const acceptedPersonalLearningSessions = await fetchAcceptedPersonalLearningSessions(currentWeekStart, currentUserId);
+        
         // Update hasAcceptedSessions state
         setHasAcceptedSessions(acceptedStudySessions.length > 0);
         
-        // Combine regular events with accepted study sessions
-        const combinedEvents = [...fetchedEvents, ...acceptedStudySessions];
+        // Check if there are any accepted personal learning sessions
+        const hasAcceptedLearning = acceptedPersonalLearningSessions.length > 0;
+        setHasAcceptedPersonalLearning(hasAcceptedLearning);
         
-        if (combinedEvents.length > 0) {
-          setEvents(combinedEvents);
-        } else if (initialEvents.length > 0 && events.length === 0) {
-          // If no events were fetched but we have initial events, use those
-          setEvents(initialEvents);
-        }
+        // Combine regular events with accepted study sessions and personal learning sessions
+        const combinedEvents = [...fetchedEvents, ...acceptedStudySessions, ...acceptedPersonalLearningSessions];
         
-        // Fetch lectures for the current week
-        const lectureEvents = await fetchLectures(currentWeekStart);
-        setLectures(lectureEvents);
+        // Fetch lectures for the current week, filtered by user's selected courses
+        const fetchedLectures = await fetchLectures(currentWeekStart, currentUserId);
         
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Failed to load schedule data. Please try again later.');
+        // Update events state
+        setEvents(combinedEvents);
+        
+        // Update lectures state
+        setLectures(fetchedLectures);
+        
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setError('Failed to fetch schedule data. Please try refreshing the page.');
       }
     };
     
     fetchData();
-  }, [currentWeekStart, user, userId, initialEvents, events.length]);
+  }, [currentWeekStart, userId, user?.username]);
   
   // Combine regular events with generated study sessions and lectures and personal learning slots
   const allEvents = useMemo(() => {
@@ -267,193 +284,101 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
       // Add or subtract 7 days
       newDate.setDate(prevDate.getDate() + (direction === 'next' ? 7 : -7));
       
-      // Clear study sessions when navigating to a new week
-      if (generatedStudySessions.length > 0) {
-        setGeneratedStudySessions([]);
-      }
-      
       return newDate;
     });
   };
 
   // Handle generating study sessions
   const handleGenerateStudySessions = async () => {
-    if (!user) {
-      setError('You must be logged in to generate study sessions.');
-      return;
-    }
-    
-    setIsLoading(true);
+    setIsStudySessionLoading(true);
     setLoadingType('generate');
     setError(null);
     
     try {
+      // Generate study sessions for the current week
+      const currentUserId = user?.username || userId;
+      
+      // Re-fetch lectures to ensure we have the most up-to-date data
+      const fetchedLectures = await fetchLectures(currentWeekStart, currentUserId);
+      
+      // Update lectures state
+      setLectures(fetchedLectures);
+      
+      // Generate study sessions
       const studySessions = await generateStudySessions(
         currentWeekStart,
         events,
-        lectures,
-        user.username
+        fetchedLectures,
+        currentUserId
       );
       
-      if (studySessions.length === 0) {
-        setError('No suitable study times found. Try adding more free time to your schedule.');
-      } else {
-        setGeneratedStudySessions(studySessions);
-      }
-    } catch (err) {
-      console.error('Error generating study sessions:', err);
+      // Update generated study sessions state
+      setGeneratedStudySessions(studySessions);
+      
+      // Clear any previous error
+      setError(null);
+    } catch (error) {
+      console.error('Error generating study sessions:', error);
       setError('Failed to generate study sessions. Please try again later.');
     } finally {
-      setIsLoading(false);
+      setIsStudySessionLoading(false);
       setLoadingType(null);
     }
   };
 
   // Delete accepted study sessions and regenerate
   const handleRegenerateStudySessions = async () => {
-    if (!user) {
-      setError('You must be logged in to regenerate study sessions.');
-      return;
-    }
-    
-    setIsLoading(true);
+    setIsStudySessionLoading(true);
     setLoadingType('regenerate');
     setError(null);
     
     try {
-      // First delete all accepted study sessions for the current week
-      await deleteAcceptedStudySessions(currentWeekStart, user.username);
+      // Delete existing accepted study sessions
+      const currentUserId = user?.username || userId;
+      await deleteAcceptedStudySessions(currentWeekStart, currentUserId);
       
-      // Update the events list to remove the deleted sessions
+      // Re-fetch events (without the deleted study sessions)
       const fetchedEvents = await fetchEvents(currentWeekStart);
+      
+      // Update events state
       setEvents(fetchedEvents);
       
-      // Set hasAcceptedSessions to false since we've deleted them
-      setHasAcceptedSessions(false);
+      // Re-fetch lectures to ensure we have the most up-to-date data
+      const fetchedLectures = await fetchLectures(currentWeekStart, currentUserId);
       
-      // Now generate new study sessions
-      const studySessions = await generateStudySessions(
+      // Update lectures state
+      setLectures(fetchedLectures);
+      
+      // Generate new study sessions
+      const newStudySessions = await generateStudySessions(
         currentWeekStart,
-        fetchedEvents, // Use the updated events list
-        lectures,
-        user.username
+        fetchedEvents,
+        fetchedLectures,
+        currentUserId
       );
       
-      if (studySessions.length === 0) {
-        setError('No suitable study times found. Try adding more free time to your schedule.');
-      } else {
-        setGeneratedStudySessions(studySessions);
-      }
-    } catch (err) {
-      console.error('Error regenerating study sessions:', err);
+      // Update generated study sessions state
+      setGeneratedStudySessions(newStudySessions);
+      
+      // Update hasAcceptedSessions state
+      setHasAcceptedSessions(false);
+      
+      // Clear any previous error
+      setError(null);
+    } catch (error) {
+      console.error('Error regenerating study sessions:', error);
       setError('Failed to regenerate study sessions. Please try again later.');
     } finally {
-      setIsLoading(false);
+      setIsStudySessionLoading(false);
       setLoadingType(null);
     }
-  };
-
-  // Clear study sessions
-  const clearStudySessions = () => {
-    setGeneratedStudySessions([]);
-  };
-
-  // Create test events for debugging if needed
-  const createTestEvents = () => {
-    const testEvents: Event[] = [];
-    
-    // Create one event for each weekday
-    for (let dayIndex = 0; dayIndex < 5; dayIndex++) {
-      // Create the date part without time
-      const currentDay = new Date(currentWeekStart);
-      currentDay.setDate(currentWeekStart.getDate() + dayIndex);
-      currentDay.setHours(0, 0, 0, 0);
-      
-      // Format the date part as YYYY-MM-DD
-      const dateStr = currentDay.toISOString().split('T')[0];
-      
-      // Create event for 9AM + dayIndex
-      const eventHour = 9 + dayIndex;
-      const eventStartTimeStr = `${eventHour.toString().padStart(2, '0')}:00:00.000Z`;
-      const eventEndHour = eventHour + 1;
-      const eventEndTimeStr = `${eventEndHour.toString().padStart(2, '0')}:00:00.000Z`;
-      
-      const eventStartIso = `${dateStr}T${eventStartTimeStr}`;
-      const eventEndIso = `${dateStr}T${eventEndTimeStr}`;
-      
-      const now = new Date().toISOString();
-      
-      // Create event names based on the day of the week
-      const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-      const eventName = `${dayNames[dayIndex]} Event (${formatWeekDate(currentDay)})`;
-      
-      testEvents.push({
-        id: `test-event-${dayIndex}`,
-        title: eventName,
-        description: `Test event for ${dayNames[dayIndex]}`,
-        type: 'MEETING',
-        startDate: eventStartIso,
-        endDate: eventEndIso,
-        createdAt: now,
-        updatedAt: now
-      });
-      
-      // Add a lecture for each day at 1PM
-      const lectureHour = 13;
-      const lectureStartTimeStr = `${lectureHour.toString().padStart(2, '0')}:00:00.000Z`;
-      const lectureEndHour = lectureHour + 2;
-      const lectureEndTimeStr = `${lectureEndHour.toString().padStart(2, '0')}:00:00.000Z`;
-      
-      const lectureStartIso = `${dateStr}T${lectureStartTimeStr}`;
-      const lectureEndIso = `${dateStr}T${lectureEndTimeStr}`;
-      
-      testEvents.push({
-        id: `lecture-test-${dayIndex}`,
-        title: `COMP-${1000 + dayIndex}: Sample Lecture`,
-        description: `Lecture for COMP-${1000 + dayIndex}`,
-        type: 'OTHER',
-        startDate: lectureStartIso,
-        endDate: lectureEndIso,
-        createdAt: now,
-        updatedAt: now,
-        isLecture: true
-      });
-      
-      // Add a lab for Monday, Wednesday, and Friday at 3:30PM
-      if (dayIndex % 2 === 0) {
-        const labHour = 15;
-        const labMinute = 30;
-        const labStartTimeStr = `${labHour.toString().padStart(2, '0')}:${labMinute.toString().padStart(2, '0')}:00.000Z`;
-        const labEndHour = 17;
-        const labEndMinute = 0;
-        const labEndTimeStr = `${labEndHour.toString().padStart(2, '0')}:${labEndMinute.toString().padStart(2, '0')}:00.000Z`;
-        
-        const labStartIso = `${dateStr}T${labStartTimeStr}`;
-        const labEndIso = `${dateStr}T${labEndTimeStr}`;
-        
-        testEvents.push({
-          id: `lab-test-${dayIndex}`,
-          title: `COMP-${1000 + dayIndex}: Lab Session`,
-          description: `Lab for COMP-${1000 + dayIndex}`,
-          type: 'OTHER',
-          startDate: labStartIso,
-          endDate: labEndIso,
-          createdAt: now,
-          updatedAt: now,
-          isLab: true
-        });
-      }
-    }
-    
-    console.log('Created test events:', testEvents.length);
-    setEvents(testEvents);
   };
 
   // Handle accepting all study sessions
   const handleAcceptAllSessions = async () => {
     if (!user || generatedStudySessions.length === 0) return;
     
-    setIsLoading(true);
+    setIsStudySessionLoading(true);
     setLoadingType('accept');
     try {
       console.log('Accepting all study sessions:', generatedStudySessions.length);
@@ -486,7 +411,7 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
       console.error('Error accepting study sessions:', error);
       setError('Failed to accept study sessions. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsStudySessionLoading(false);
       setLoadingType(null);
     }
   };
@@ -506,34 +431,35 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
   
   // Handle progress saved in the quiz modal
   const handleProgressSaved = (lectureId?: string) => {
-    // If we have a lectureId from the callback, add it to the recentlyCompletedLectures
-    // If not, fall back to selectedLecture?.id for backward compatibility
+    setIsQuizModalOpen(false);
+    setSelectedLecture(null);
+    
+    // Add the lectureId to recently completed lectures if provided
     if (lectureId) {
-      setRecentlyCompletedLectures(prevState => [...prevState, lectureId]);
-    } else if (selectedLecture?.id) {
-      setRecentlyCompletedLectures(prevState => [...prevState, selectedLecture.id as string]);
+      setRecentlyCompletedLectures(prev => [...prev, lectureId]);
     }
     
-    // Refresh data after progress is saved
+    // Fetch updated data to reflect any progress changes
     const fetchUpdatedData = async () => {
-      if (!user) return;
-      
       try {
-        // Fetch events again to reflect any changes
-        const fetchedEvents = await fetchEvents(currentWeekStart);
-        const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, user.username);
+        const currentUserId = user?.username || userId;
         
-        // Combine them and update the state
+        // Fetch events for the current week
+        const fetchedEvents = await fetchEvents(currentWeekStart);
+        
+        // Fetch accepted study sessions for the current week
+        const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, currentUserId);
+        
+        // Combine regular events with accepted study sessions
         const combinedEvents = [...fetchedEvents, ...acceptedStudySessions];
         setEvents(combinedEvents);
         
-        // Fetch lectures too to reflect any progress updates
-        const lectureEvents = await fetchLectures(currentWeekStart);
+        // Fetch lectures too to reflect any progress updates, filtered by selected courses
+        const lectureEvents = await fetchLectures(currentWeekStart, currentUserId);
         setLectures(lectureEvents);
         
-        console.log('Refreshed events after progress saved');
       } catch (error) {
-        console.error('Error refreshing data after progress saved:', error);
+        console.error('Error updating data after progress save:', error);
       }
     };
     
@@ -542,65 +468,181 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
 
   // Handle generating personal learning time slots
   const handleGeneratePersonalLearningSlots = async () => {
-    if (!user) {
-      setError('You must be logged in to generate personal learning slots.');
-      return;
-    }
-    
-    setIsLoading(true);
-    setLoadingType('generate');
+    setIsPersonalLearningLoading(true);
     setError(null);
     
     try {
-      // First, get all personal learning items to check if any are active
-      const personalLearningItems = await getPersonalLearningItems(user.username);
+      const currentUserId = user?.username || userId;
       
-      if (personalLearningItems.length > 0) {
-        const activeItems = personalLearningItems.filter(item => item.isActive !== false);
-        
-        if (activeItems.length === 0) {
-          setError(
-            <div className="error-with-link">
-              <p>You have no active personal learning items.</p>
-              <p>Please <a href="/personal-learning">activate at least one item</a> in the Personal Learning page.</p>
-            </div>
-          );
-          setIsLoading(false);
-          setLoadingType(null);
-          return;
-        }
+      // Re-fetch lectures to ensure we have the most up-to-date data, filtered by selected courses
+      const fetchedLectures = await fetchLectures(currentWeekStart, currentUserId);
+      
+      // Update lectures state
+      setLectures(fetchedLectures);
+      
+      // Check if personal learning items exist for this user
+      const personalItems = await getPersonalLearningItems(currentUserId);
+      
+      if (personalItems.length === 0) {
+        setIsPersonalLearningLoading(false);
+        setError(
+          <span>
+            You haven't added any personal learning subjects yet. 
+            <a href="/personal-learning" className="nav-link">Add them here</a>.
+          </span>
+        );
+        return;
       }
       
-      const learningSlots = await generatePersonalLearningSlots(
+      // Generate personal learning slots
+      const personalLearningEvents = await generatePersonalLearningSlots(
         currentWeekStart,
         events,
-        lectures,
-        user.username
+        fetchedLectures,
+        currentUserId
       );
       
-      if (learningSlots.length === 0) {
-        setError('No suitable personal learning times found. Try adding more free time to your schedule.');
-      } else {
-        setPersonalLearningSlots(learningSlots);
-      }
-    } catch (err: any) {
-      console.error('Error generating personal learning slots:', err);
+      // Update personal learning slots state
+      setPersonalLearningSlots(personalLearningEvents);
       
-      // Provide a more specific error message if possible
-      if (err.message && err.message.includes('parse')) {
-        setError('Error processing the scheduling algorithm response. Please try again later.');
-      } else {
-        setError('Failed to generate personal learning slots. Please try again later.');
-      }
+      // Clear any previous error
+      setError(null);
+    } catch (error) {
+      console.error('Error generating personal learning slots:', error);
+      setError('Failed to generate personal learning slots. Please try again later.');
     } finally {
-      setIsLoading(false);
-      setLoadingType(null);
+      setIsPersonalLearningLoading(false);
     }
+  };
+
+  // Clear study sessions
+  const clearStudySessions = () => {
+    setGeneratedStudySessions([]);
   };
 
   // Clear personal learning slots
   const clearPersonalLearningSlots = () => {
     setPersonalLearningSlots([]);
+  };
+
+  // Delete accepted personal learning sessions and regenerate
+  const handleRegeneratePersonalLearning = async () => {
+    setIsPersonalLearningLoading(true);
+    setLoadingType('regenerate');
+    setError(null);
+    
+    try {
+      // Delete existing accepted personal learning sessions
+      const currentUserId = user?.username || userId;
+      await deleteAcceptedPersonalLearningSessions(currentWeekStart, currentUserId);
+      
+      // Re-fetch events (without the deleted personal learning sessions)
+      const fetchedEvents = await fetchEvents(currentWeekStart);
+      const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, currentUserId);
+      
+      // Combine and update events state
+      const combinedEvents = [...fetchedEvents, ...acceptedStudySessions];
+      setEvents(combinedEvents);
+      
+      // Update state to reflect that there are no longer any accepted personal learning sessions
+      setHasAcceptedPersonalLearning(false);
+      
+      // Re-fetch lectures to ensure we have the most up-to-date data
+      const fetchedLectures = await fetchLectures(currentWeekStart, currentUserId);
+      setLectures(fetchedLectures);
+      
+      // Generate new personal learning slots
+      const personalItems = await getPersonalLearningItems(currentUserId);
+      if (personalItems.length === 0) {
+        setError(
+          <span>
+            You haven't added any personal learning subjects yet. 
+            <a href="/personal-learning" className="nav-link">Add them here</a>.
+          </span>
+        );
+        setIsPersonalLearningLoading(false);
+        setLoadingType(null);
+        return;
+      }
+      
+      // Generate new personal learning slots
+      const newPersonalLearningSlots = await generatePersonalLearningSlots(
+        currentWeekStart,
+        combinedEvents,
+        fetchedLectures,
+        currentUserId
+      );
+      
+      // Update personal learning slots state
+      setPersonalLearningSlots(newPersonalLearningSlots);
+      
+      // Clear any previous error
+      setError(null);
+    } catch (error) {
+      console.error('Error regenerating personal learning slots:', error);
+      setError('Failed to regenerate personal learning slots. Please try again later.');
+    } finally {
+      setIsPersonalLearningLoading(false);
+      setLoadingType(null);
+    }
+  };
+
+  // Handle accepting all personal learning slots
+  const handleAcceptAllPersonalLearning = async () => {
+    if (!user || personalLearningSlots.length === 0) return;
+    
+    setIsPersonalLearningLoading(true);
+    setLoadingType('accept');
+    try {
+      console.log('Accepting all personal learning slots:', personalLearningSlots.length);
+      
+      const currentUserId = user.username || userId;
+      
+      // Get all personal learning items to determine subjects
+      const personalItems = await getPersonalLearningItems(currentUserId);
+      
+      // Default subject if none are found
+      let defaultSubject = "Personal Learning";
+      
+      // Use the first active subject as the default if available
+      if (personalItems.length > 0) {
+        const activeItems = personalItems.filter(item => item.isActive !== false);
+        if (activeItems.length > 0) {
+          defaultSubject = activeItems[0].subject;
+        }
+      }
+      
+      // Save each session to the database
+      const savePromises = personalLearningSlots.map(session => 
+        saveAcceptedPersonalLearningSession(session, currentUserId, currentWeekStart, defaultSubject)
+      );
+      
+      await Promise.all(savePromises);
+      
+      // Clear the generated sessions since they've been accepted
+      setPersonalLearningSlots([]);
+      
+      // Fetch events, including the newly accepted personal learning sessions
+      const fetchedEvents = await fetchEvents(currentWeekStart);
+      const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, currentUserId);
+      const acceptedPersonalLearningSessions = await fetchAcceptedPersonalLearningSessions(currentWeekStart, currentUserId);
+      
+      // Combine them and update the state
+      const combinedEvents = [...fetchedEvents, ...acceptedStudySessions, ...acceptedPersonalLearningSessions];
+      setEvents(combinedEvents);
+      
+      // Update state to reflect that there are accepted personal learning sessions
+      setHasAcceptedPersonalLearning(true);
+      
+      console.log('All personal learning slots accepted successfully');
+      console.log('Updated events count:', combinedEvents.length);
+    } catch (error) {
+      console.error('Error accepting personal learning slots:', error);
+      setError('Failed to accept personal learning slots. Please try again.');
+    } finally {
+      setIsPersonalLearningLoading(false);
+      setLoadingType(null);
+    }
   };
 
   return (
@@ -614,91 +656,117 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
         
         <div className="schedule-actions">
           {/* Study Sessions generation button */}
-          <div className="action-group">
-            {hasAcceptedSessions ? (
-              <button 
-                className="action-button regenerate-button"
-                onClick={handleRegenerateStudySessions}
-                disabled={isLoading}
-              >
-                {isLoading && loadingType === 'regenerate' ? (
-                  <span className="loading-spinner"></span>
-                ) : (
-                  'Regenerate Study Sessions'
-                )}
-              </button>
-            ) : generatedStudySessions.length > 0 ? (
-              <div className="button-group">
+          <div className="action-container">
+            <div className="action-group study-sessions-group">
+              <div className="group-header">
+                <h3>Study Sessions</h3>
+                <p className="group-description">
+                  Generate optimized study time slots based on your weekly schedule and preferences.
+                </p>
+              </div>
+              {hasAcceptedSessions ? (
                 <button 
-                  className="action-button accept-button"
-                  onClick={handleAcceptAllSessions}
-                  disabled={isLoading}
+                  className="action-button regenerate-button"
+                  onClick={handleRegenerateStudySessions}
+                  disabled={isStudySessionLoading || isPersonalLearningLoading}
                 >
-                  {isLoading && loadingType === 'accept' ? (
+                  {isStudySessionLoading && loadingType === 'regenerate' ? (
                     <span className="loading-spinner"></span>
                   ) : (
-                    'Accept Study Sessions'
+                    'Regenerate Study Sessions'
                   )}
                 </button>
+              ) : generatedStudySessions.length > 0 ? (
+                <div className="button-group">
+                  <button 
+                    className="action-button accept-button"
+                    onClick={handleAcceptAllSessions}
+                    disabled={isStudySessionLoading || isPersonalLearningLoading}
+                  >
+                    {isStudySessionLoading && loadingType === 'accept' ? (
+                      <span className="loading-spinner"></span>
+                    ) : (
+                      'Accept Study Sessions'
+                    )}
+                  </button>
+                  <button 
+                    className="action-button clear-button"
+                    onClick={clearStudySessions}
+                    disabled={isStudySessionLoading || isPersonalLearningLoading}
+                  >
+                    Clear
+                  </button>
+                </div>
+              ) : (
                 <button 
-                  className="action-button clear-button"
-                  onClick={clearStudySessions}
-                  disabled={isLoading}
+                  className="action-button generate-button"
+                  onClick={handleGenerateStudySessions}
+                  disabled={isStudySessionLoading || isPersonalLearningLoading}
                 >
-                  Clear
+                  {isStudySessionLoading ? (
+                    <span className="loading-spinner"></span>
+                  ) : (
+                    'Generate Study Sessions'
+                  )}
                 </button>
-              </div>
-            ) : (
-              <button 
-                className="action-button generate-button"
-                onClick={handleGenerateStudySessions}
-                disabled={isLoading}
-              >
-                {isLoading && loadingType === 'generate' ? (
-                  <span className="loading-spinner"></span>
-                ) : (
-                  'Generate Study Sessions'
-                )}
-              </button>
-            )}
-          </div>
+              )}
+            </div>
           
-          {/* Personal Learning slots generation button */}
-          <div className="action-group">
-            {personalLearningSlots.length > 0 ? (
-              <div className="button-group">
-                <button 
-                  className="action-button accept-button"
-                  onClick={() => {
-                    // For now, we don't have a "save" function for personal learning slots
-                    // This could be added later if needed
-                    alert('Personal learning slots created. You can view them on your schedule.');
-                  }}
-                  disabled={isLoading}
-                >
-                  Accept Learning Hours
-                </button>
-                <button 
-                  className="action-button clear-button"
-                  onClick={clearPersonalLearningSlots}
-                  disabled={isLoading}
-                >
-                  Clear
-                </button>
+            {/* Personal Learning slots generation button */}
+            <div className="action-group personal-learning-group">
+              <div className="group-header">
+                <h3>Personal Learning</h3>
+                <p className="group-description">
+                  Schedule dedicated time for your personal learning projects and subjects.
+                </p>
               </div>
-            ) : (
-              <button 
-                className="action-button generate-button personal-learning-button"
-                onClick={handleGeneratePersonalLearningSlots}
-                disabled={isLoading}
-              >
-                {isLoading && loadingType === 'generate' ? (
-                  <span className="loading-spinner"></span>
-                ) : (
-                  'Generate Personal Learning Hours'
-                )}
-              </button>
-            )}
+              {hasAcceptedPersonalLearning ? (
+                <button 
+                  className="action-button regenerate-button"
+                  onClick={handleRegeneratePersonalLearning}
+                  disabled={isStudySessionLoading || isPersonalLearningLoading}
+                >
+                  {isPersonalLearningLoading && loadingType === 'regenerate' ? (
+                    <span className="loading-spinner"></span>
+                  ) : (
+                    'Regenerate Learning Hours'
+                  )}
+                </button>
+              ) : personalLearningSlots.length > 0 ? (
+                <div className="button-group">
+                  <button 
+                    className="action-button accept-button"
+                    onClick={handleAcceptAllPersonalLearning}
+                    disabled={isStudySessionLoading || isPersonalLearningLoading}
+                  >
+                    {isPersonalLearningLoading && loadingType === 'accept' ? (
+                      <span className="loading-spinner"></span>
+                    ) : (
+                      'Accept Learning Hours'
+                    )}
+                  </button>
+                  <button 
+                    className="action-button clear-button"
+                    onClick={clearPersonalLearningSlots}
+                    disabled={isStudySessionLoading || isPersonalLearningLoading}
+                  >
+                    Clear
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  className="action-button generate-button personal-learning-button"
+                  onClick={handleGeneratePersonalLearningSlots}
+                  disabled={isStudySessionLoading || isPersonalLearningLoading}
+                >
+                  {isPersonalLearningLoading ? (
+                    <span className="loading-spinner"></span>
+                  ) : (
+                    'Generate Personal Learning Hours'
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -716,15 +784,9 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
       />
       <ScheduleLegend />
       
-      {allEvents.length === 0 && !isLoading && (
+      {allEvents.length === 0 && !isStudySessionLoading && !isPersonalLearningLoading && (
         <div className="no-events-message">
           <p>No events found for this week.</p>
-          <button 
-            className="create-test-events-btn"
-            onClick={createTestEvents}
-          >
-            Create Test Events
-          </button>
         </div>
       )}
       

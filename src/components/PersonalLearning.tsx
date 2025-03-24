@@ -181,12 +181,30 @@ const PersonalLearning: React.FC = () => {
     .reduce((total, item) => total + item.weeklyDedicationHours, 0);
 
   if (loading) {
-    return <div className="personal-learning">Loading personal learning items...</div>;
+    return (
+      <div className="personal-learning">
+        <div className="personal-learning-header">
+          <h2>Personal Learning</h2>
+          <p className="page-description">
+            Manage your personal learning topics and track your progress towards your learning goals.
+          </p>
+        </div>
+        <div className="loading-indicator">
+          <span className="loading-spinner"></span>
+          <span className="loading-text">Loading your personal learning items...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="personal-learning">
-      <h2>Personal Learning</h2>
+      <div className="personal-learning-header">
+        <h2>Personal Learning</h2>
+        <p className="page-description">
+          Manage your personal learning topics and track your progress towards your learning goals.
+        </p>
+      </div>
       
       {message && (
         <div className={`message ${message.type}`}>
@@ -194,15 +212,28 @@ const PersonalLearning: React.FC = () => {
         </div>
       )}
       
-      <div className="learning-summary">
-        <div className="total-weekly-hours">
-          <h3>Total Weekly Hours: <span>{totalActiveHoursPerWeek}</span></h3>
-          <p>Hours dedicated to learning across all active subjects this week</p>
+      <div className="learning-container">
+        <div className="group-header">
+          <h3>Weekly Summary</h3>
+          <p className="group-description">
+            Overview of your weekly time commitment for all active learning subjects.
+          </p>
+        </div>
+        <div className="learning-summary">
+          <div className="total-weekly-hours">
+            <h3>Total Weekly Hours: <span>{totalActiveHoursPerWeek}</span></h3>
+            <p>Hours dedicated to learning across all active subjects this week</p>
+          </div>
         </div>
       </div>
 
       <div className="learning-items">
-        <h3>Your Learning Items</h3>
+        <div className="group-header">
+          <h3>Your Learning Items</h3>
+          <p className="group-description">
+            Personal learning topics that you're currently focusing on or planning to study.
+          </p>
+        </div>
         
         {learningItems.length === 0 ? (
           <div className="no-items">
@@ -245,19 +276,18 @@ const PersonalLearning: React.FC = () => {
                       <span className="label">Weekly Hours:</span>
                       <div className="hours-adjuster">
                         <button 
+                          className="adjuster-btn"
                           onClick={() => item.weeklyDedicationHours > 1 && 
                             handleWeeklyHoursChange(item.id || '', item.weeklyDedicationHours - 1)}
                           disabled={!item.isActive || item.weeklyDedicationHours <= 1}
-                          className="adjuster-btn"
                         >
                           -
                         </button>
                         <span className="hours-value">{item.weeklyDedicationHours}</span>
                         <button 
-                          onClick={() => item.weeklyDedicationHours < item.totalRequiredHours && 
-                            handleWeeklyHoursChange(item.id || '', item.weeklyDedicationHours + 1)}
-                          disabled={!item.isActive || item.weeklyDedicationHours >= item.totalRequiredHours}
                           className="adjuster-btn"
+                          onClick={() => handleWeeklyHoursChange(item.id || '', item.weeklyDedicationHours + 1)}
+                          disabled={!item.isActive}
                         >
                           +
                         </button>
@@ -265,18 +295,18 @@ const PersonalLearning: React.FC = () => {
                     </div>
                   </div>
                   
-                  {item.isActive && (
-                    <div className="estimated-completion">
-                      <span className="label">Estimated Completion:</span> 
+                  <div className="estimated-completion">
+                    <div className="dates">
+                      <span className="label">Estimated Completion Time:</span>
                       <span className="value">
                         {calculateEstimatedWeeks(item.totalRequiredHours, item.weeklyDedicationHours)} weeks
                       </span>
                     </div>
-                  )}
+                  </div>
                   
                   {!item.isActive && (
                     <div className="inactive-message">
-                      <p>This learning item is currently inactive and won't be included in scheduling.</p>
+                      <p>This learning item is currently inactive and won't be included in your weekly schedule.</p>
                     </div>
                   )}
                 </div>

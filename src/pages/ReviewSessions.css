@@ -1,30 +1,39 @@
 .review-sessions-page {
-  padding: 20px;
-  max-width: 1200px;
+  padding: 2rem 1.5rem;
+  max-width: 1280px;
   margin: 0 auto;
+  margin-top: 2rem;
+  box-sizing: border-box;
 }
 
 .reviews-header {
-  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding: 1.5rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   position: relative;
 }
 
 .reviews-header h1 {
-  font-size: 28px;
+  margin: 0;
   color: #333;
-  margin-bottom: 10px;
+  font-size: 1.75rem;
+  line-height: 1.2;
 }
 
 .page-description {
+  margin: 0;
   color: #666;
-  font-size: 16px;
-  margin-bottom: 20px;
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 .refresh-button-container {
-  position: absolute;
-  right: 0;
-  top: 0;
+  margin-top: 1rem;
 }
 
 .refresh-button {
@@ -43,31 +52,60 @@
   color: #212529;
 }
 
-.review-tabs {
+.reviews-container {
+  margin: 20px 0 25px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+/* Group header styles matching WeeklySchedule */
+.group-header {
   display: flex;
-  margin-bottom: 20px;
-  border-bottom: 1px solid #ddd;
+  flex-direction: column;
+  margin-bottom: 0;
+  padding: 15px 20px;
+  border-bottom: 1px solid #eaeaea;
+  background-color: #f5f8ff;
 }
 
-.tab-button {
-  padding: 12px 24px;
-  background: none;
-  border: none;
-  border-bottom: 3px solid transparent;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 500;
-  color: #666;
-  transition: all 0.2s;
+.group-header h3 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 18px;
+  color: #2c5282;
+  text-align: left;
 }
 
-.tab-button:hover {
-  color: #333;
+.group-description {
+  margin: 0;
+  color: #4a5568;
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 
-.tab-button.active {
-  color: #3498db;
-  border-bottom-color: #3498db;
+/* Loading spinner */
+.loading-spinner {
+  width: 24px !important;
+  height: 24px !important;
+  border: 3px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 50% !important;
+  border-top-color: #007bff !important;
+  animation: spin 1s ease-in-out infinite !important;
+  margin-right: 10px !important;
+  display: inline-block !important;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 14px !important;
+  color: #666 !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
 }
 
 .loading-indicator {
@@ -94,6 +132,9 @@
   border-radius: 8px;
   text-align: center;
   color: #6c757d;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e0e0e0;
+  margin: 20px 0 25px;
 }
 
 .no-reviews-message p {
@@ -101,28 +142,69 @@
   font-size: 16px;
 }
 
-/* Card Grid Layout */
+/* Card Grid Layout with matching styling to action-container */
 .reviews-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
   gap: 25px;
-  margin-top: 20px;
-  padding: 15px;
+  padding: 20px;
   background-color: #fafafa;
-  border: 1px solid #eaeaea;
-  border-radius: 8px;
+  border-radius: 0;
 }
 
 /* Responsive adjustments */
-@media (max-width: 768px) {
-  .reviews-card-grid {
-    grid-template-columns: 1fr;
+@media (min-width: 768px) {
+  .reviews-header {
+    flex-direction: row;
+    align-items: center;
+  }
+  
+  .reviews-header h1 {
+    font-size: 2rem;
+    min-width: 200px;
+  }
+  
+  .page-description {
+    flex-grow: 1;
+    margin: 0 1.5rem;
   }
   
   .refresh-button-container {
-    position: static;
-    margin-top: 16px;
-    display: flex;
-    justify-content: flex-end;
+    margin-top: 0;
+  }
+  
+  .group-header {
+    flex-direction: row;
+    align-items: center;
+  }
+  
+  .group-header h3 {
+    margin-bottom: 0;
+    min-width: 150px;
+  }
+  
+  .group-description {
+    flex-grow: 1;
+    margin: 0 0 0 15px;
+  }
+}
+
+@media (max-width: 767px) {
+  .review-sessions-page {
+    padding: 1rem;
+    margin-top: 0.5rem;
+  }
+  
+  .reviews-header {
+    padding: 1rem;
+  }
+  
+  .reviews-card-grid {
+    grid-template-columns: 1fr;
+    padding: 15px;
+  }
+  
+  .group-header {
+    padding: 12px 15px;
   }
 } 

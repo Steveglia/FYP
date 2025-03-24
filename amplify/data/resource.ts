@@ -111,6 +111,22 @@ const schema = a
       })
       .authorization(allow => [allow.publicApiKey()]),
 
+    AcceptedPersonalLearningSession: a
+      .model({
+        day: a.string(),
+        startTime: a.string(),
+        endTime: a.string(),
+        subject: a.string(),
+        startDate: a.string(),
+        endDate: a.string(),
+        userId: a.string(),
+        weekStartDate: a.string(),
+        title: a.string(),
+        description: a.string(),
+        type: a.enum(['LEARNING']),
+      })
+      .authorization(allow => [allow.publicApiKey()]),
+
     UserProgress: a
       .model({
         userId: a.string().required(),

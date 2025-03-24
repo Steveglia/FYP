@@ -184,7 +184,10 @@ const ReviewSessions: React.FC = () => {
       </div>
       
       {isLoading ? (
-        <div className="loading-indicator">Loading your review sessions...</div>
+        <div className="loading-indicator">
+          <span className="loading-spinner"></span>
+          <span className="loading-text">Loading your review sessions...</span>
+        </div>
       ) : error ? (
         <div className="error-message">{error}</div>
       ) : reviewSessions.length === 0 ? (
@@ -193,15 +196,23 @@ const ReviewSessions: React.FC = () => {
           <p>Complete study sessions and record your progress to get personalized review recommendations.</p>
         </div>
       ) : (
-        <div className="reviews-card-grid">
-          {reviewSessions.map(review => (
-            <ReviewCard
-              key={review.id}
-              review={review}
-              lectureInfo={lectures[review.lectureId]}
-              onReviewCompleted={handleReviewCompleted}
-            />
-          ))}
+        <div className="reviews-container">
+          <div className="group-header">
+            <h3>Available Reviews</h3>
+            <p className="group-description">
+              Review sessions are scheduled based on your memory retention patterns for optimal learning.
+            </p>
+          </div>
+          <div className="reviews-card-grid">
+            {reviewSessions.map(review => (
+              <ReviewCard
+                key={review.id}
+                review={review}
+                lectureInfo={lectures[review.lectureId]}
+                onReviewCompleted={handleReviewCompleted}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>

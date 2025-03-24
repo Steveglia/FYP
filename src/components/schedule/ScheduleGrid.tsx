@@ -93,6 +93,24 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
       );
     }
     
+    // For work and leisure events, allow text wrapping
+    const isWorkOrLeisure = 
+      (event.type && ['WORK', 'LEISURE'].includes(event.type.toUpperCase())) ||
+      (event.title && (event.title.toLowerCase().includes('work') || 
+                      event.title.toLowerCase().includes('leisure') || 
+                      event.title.toLowerCase().includes('job')));
+    
+    if (isWorkOrLeisure) {
+      return (
+        <>
+          <span>{title.length > 20 ? title.substring(0, 20) : title}</span>
+          {isMultiHourEvent && event.description && (
+            <div>{event.description.substring(0, 30)}</div>
+          )}
+        </>
+      );
+    }
+    
     // For study sessions, keep it very short
     if (ensureValidEventType(event.type) === 'STUDY' || title.toLowerCase().includes('study')) {
       return 'Study';
@@ -231,12 +249,25 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
       }
     }
     
+    // Check if it's a work or leisure event
+    const isWorkOrLeisure = 
+      (event.type && ['WORK', 'LEISURE'].includes(event.type.toUpperCase())) ||
+      (event.title && (event.title.toLowerCase().includes('work') || 
+                     event.title.toLowerCase().includes('leisure') || 
+                     event.title.toLowerCase().includes('job')));
+    
     // For single-hour events, provide standard padding
     if (!isMultiHourEvent) {
       // Study sessions have less padding for compact display
       if (ensureValidEventType(event.type) === 'STUDY' || (event.title && event.title.toLowerCase().includes('study'))) {
         styles.padding = '4px 6px';
-      } else {
+      } 
+      // Work/leisure events need specific styling
+      else if (isWorkOrLeisure) {
+        styles.padding = '5px 8px';
+        styles.flexDirection = 'column';
+      }
+      else {
         // Regular single-hour events get more padding
         styles.padding = '6px 8px';
       }
@@ -245,6 +276,11 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     else {
       styles.flexDirection = 'column';
       styles.padding = '8px 10px'; // Increased horizontal padding
+      
+      // Work/leisure specific styling for multi-hour events
+      if (isWorkOrLeisure) {
+        styles.textAlign = 'center';
+      }
     }
     
     return styles;
@@ -252,6 +288,7 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
 
   // Function to get the background color based on event type
   const getBackgroundColor = (event: ScheduleEvent): string => {
+    // Check if it's a lecture or lab
     if (event.isLecture) {
       return eventTypeColors.LECTURE;
     }
@@ -259,6 +296,28 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
       return eventTypeColors.LAB;
     }
     
+    // Check for work-related events by title or description
+    if (event.title) {
+      const lowercaseTitle = event.title.toLowerCase();
+      if (lowercaseTitle.includes('work') || 
+          lowercaseTitle.includes('job') || 
+          lowercaseTitle.includes('leisure') ||
+          lowercaseTitle.includes('career')) {
+        return eventTypeColors.WORK;
+      }
+    }
+    
+    if (event.description) {
+      const lowercaseDesc = event.description.toLowerCase();
+      if (lowercaseDesc.includes('work') || 
+          lowercaseDesc.includes('job') || 
+          lowercaseDesc.includes('leisure') ||
+          lowercaseDesc.includes('career')) {
+        return eventTypeColors.WORK;
+      }
+    }
+    
+    // Use the type-based coloring with safe conversion
     const eventType = ensureValidEventType(event.type) as keyof typeof eventTypeColors;
     return eventTypeColors[eventType] || eventTypeColors.default;
   };
@@ -294,6 +353,13 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                     if (isLecture) eventClasses += ' lecture';
                     if (event.isLab) eventClasses += ' lab';
                     if (hasCompleted) eventClasses += ' completed-quiz';
+
+                    // Add work class for work and leisure events
+                    const eventType = ensureValidEventType(event.type);
+                    if (eventType === 'WORK') {
+                      eventClasses += ' work';
+                    }
+
                     if (ensureValidEventType(event.type) === 'STUDY' || (event.title && event.title.toLowerCase().includes('study'))) {
                       eventClasses += ' study';
                     }

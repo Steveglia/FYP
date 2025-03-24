@@ -43,15 +43,25 @@ export const hours = Array.from({ length: 15 }, (_, i) => i + 8); // 8 AM to 10 
 export function ensureValidEventType(type: string | null | undefined): EventType {
   if (!type) return 'OTHER';
   
+  // Normalize the type to uppercase
+  const normalizedType = type.toUpperCase();
+  
+  // Check for specific types that should be mapped to WORK
+  if (normalizedType === 'LEISURE' || 
+      normalizedType === 'WORK' || 
+      normalizedType.includes('WORK') || 
+      normalizedType.includes('JOB')) {
+    return 'WORK';
+  }
+  
   // Check if the type is one of the valid EventType values
-  if (type === 'WORK' || 
-      type === 'STUDY' || 
-      type === 'MEETING' || 
-      type === 'OTHER' || 
-      type === 'LECTURE' || 
-      type === 'LAB' ||
-      type === 'LEARNING') {
-    return type;
+  if (normalizedType === 'STUDY' || 
+      normalizedType === 'MEETING' || 
+      normalizedType === 'OTHER' || 
+      normalizedType === 'LECTURE' || 
+      normalizedType === 'LAB' ||
+      normalizedType === 'LEARNING') {
+    return normalizedType as EventType;
   }
   
   return 'OTHER';
