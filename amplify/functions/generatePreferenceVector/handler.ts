@@ -71,6 +71,61 @@ export const handler: Schema["generatePreferenceVector"]["functionHandler"] = as
               // Very early (before 8) or very late (after 20) hours
               weekVector[vectorIndex] = 2;
             }
+          } else if (studyPreference.preferredTimeOfDay === 'CIRCADIAN') {
+            // Define the values for circadian cycles pattern
+            const U = 0;  // Unavailable
+            const L = 2;  // Low Preference
+            const N = 4;  // Neutral
+            const P = 6;  // Preferred
+            const H = 9;  // Highly Preferred
+            
+            // Create the circadian pattern based on the hour and day
+            // For Monday through Friday (0-4), use the weekday pattern
+            if (dayIndex <= 4) {
+              if (hour >= 8 && hour <= 11) { // 8am-11am
+                weekVector[vectorIndex] = [P, H, H, H][hour - 8] || H;
+              } else if (hour === 12) { // 12pm
+                weekVector[vectorIndex] = H;
+              } else if (hour >= 13 && hour <= 16) { // 1pm-4pm
+                weekVector[vectorIndex] = [N, L, P, H][hour - 13] || N;
+              } else if (hour >= 17 && hour <= 19) { // 5pm-7pm
+                weekVector[vectorIndex] = [H, N, N][hour - 17] || N;
+              } else { // 8pm-10pm
+                weekVector[vectorIndex] = [L, U, U][hour - 20] || L;
+              }
+            } 
+            // For Saturday (5)
+            else if (dayIndex === 5) {
+              if (hour === 8) { // 8am
+                weekVector[vectorIndex] = N;
+              } else if (hour >= 9 && hour <= 11) { // 9am-11am
+                weekVector[vectorIndex] = [P, H, H][hour - 9] || H;
+              } else if (hour === 12) { // 12pm
+                weekVector[vectorIndex] = H;
+              } else if (hour >= 13 && hour <= 16) { // 1pm-4pm
+                weekVector[vectorIndex] = [N, L, L, N][hour - 13] || L;
+              } else if (hour >= 17 && hour <= 19) { // 5pm-7pm
+                weekVector[vectorIndex] = [P, H, N][hour - 17] || N;
+              } else { // 8pm-10pm
+                weekVector[vectorIndex] = [N, L, U][hour - 20] || L;
+              }
+            } 
+            // For Sunday (6)
+            else if (dayIndex === 6) {
+              if (hour === 8) { // 8am
+                weekVector[vectorIndex] = N;
+              } else if (hour >= 9 && hour <= 11) { // 9am-11am
+                weekVector[vectorIndex] = [P, H, H][hour - 9] || H;
+              } else if (hour === 12) { // 12pm
+                weekVector[vectorIndex] = N;
+              } else if (hour >= 13 && hour <= 16) { // 1pm-4pm
+                weekVector[vectorIndex] = [L, L, L, N][hour - 13] || L;
+              } else if (hour >= 17 && hour <= 18) { // 5pm-6pm
+                weekVector[vectorIndex] = [P, N][hour - 17] || N;
+              } else { // 7pm-10pm
+                weekVector[vectorIndex] = [N, L, L, U][hour - 19] || L;
+              }
+            }
           } else if (studyPreference.preferredTimeOfDay === 'PERSONALIZE' && studyPreference.personalizedVector) {
             try {
               // Parse the personalized vector from the stored JSON string

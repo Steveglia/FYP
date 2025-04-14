@@ -29,10 +29,19 @@ interface WeeklyScheduleProps {
 export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialEvents = [], userId }) => {
   const { user } = useAuthenticator();
   
-  // Add state for current week - now starts from the current week's Monday
+  // Add state for current week - now starts from the stored week or current week's Monday
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
-    const startDate = getMondayOfCurrentWeek();
-    return startDate;
+    // Try to get the saved week from localStorage
+    const savedWeekStr = localStorage.getItem('currentWeekStart');
+    if (savedWeekStr) {
+      const savedDate = new Date(savedWeekStr);
+      // Check if the saved date is valid
+      if (!isNaN(savedDate.getTime())) {
+        return savedDate;
+      }
+    }
+    // Fallback to current week's Monday
+    return getMondayOfCurrentWeek();
   });
   
   // Add state for events
@@ -76,6 +85,11 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
       setEvents(initialEvents);
     }
   }, []);
+  
+  // Save the current week to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('currentWeekStart', currentWeekStart.toISOString());
+  }, [currentWeekStart]);
   
   // Format date for display
   const formatWeekDate = (date: Date): string => {

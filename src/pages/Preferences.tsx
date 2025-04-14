@@ -28,7 +28,7 @@ const Preferences = () => {
     lunchBreakStart: "12:00",
     lunchBreakDuration: 60,
     studyDuringWork: false,
-    preferredTimeOfDay: "MORNING" as "MORNING" | "AFTERNOON" | "EVENING" | "PERSONALIZE",
+    preferredTimeOfDay: "MORNING" as "MORNING" | "AFTERNOON" | "EVENING" | "CIRCADIAN" | "PERSONALIZE",
     personalizedVector: new Array(105).fill(4) // Default to neutral preference (4)
   });
   const [loading, setLoading] = useState(true);
@@ -36,6 +36,7 @@ const Preferences = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [showPersonalizeGrid, setShowPersonalizeGrid] = useState(false);
   const [showFillOptions, setShowFillOptions] = useState(false);
+  const [userCourses, setUserCourses] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadPreferences() {
@@ -59,13 +60,19 @@ const Preferences = () => {
             JSON.parse(userPrefs.personalizedVector) : 
             new Array(105).fill(4);
 
+          // Store courses in state for use in suggested study hours
+          if (userPrefs.courses) {
+            const validCourses = userPrefs.courses.filter((course): course is string => course !== null);
+            setUserCourses(validCourses);
+          }
+
           setPreferences({
             studyTime: userPrefs.studyTime ?? "4",
             maxHoursPerDay: userPrefs.maxHoursPerDay ?? 8,
             lunchBreakStart: userPrefs.lunchBreakStart ?? "12:00",
             lunchBreakDuration: userPrefs.lunchBreakDuration ?? 60,
             studyDuringWork: userPrefs.studyDuringWork ?? false,
-            preferredTimeOfDay: (userPrefs.preferredTimeOfDay ?? "MORNING") as "MORNING" | "AFTERNOON" | "EVENING" | "PERSONALIZE",
+            preferredTimeOfDay: (userPrefs.preferredTimeOfDay ?? "MORNING") as "MORNING" | "AFTERNOON" | "EVENING" | "CIRCADIAN" | "PERSONALIZE",
             personalizedVector: personalizedVectorData
           });
 
@@ -78,7 +85,7 @@ const Preferences = () => {
             lunchBreakStart: "12:00",
             lunchBreakDuration: 60,
             studyDuringWork: false,
-            preferredTimeOfDay: "MORNING" as "MORNING" | "AFTERNOON" | "EVENING" | "PERSONALIZE",
+            preferredTimeOfDay: "MORNING" as "MORNING" | "AFTERNOON" | "EVENING" | "CIRCADIAN" | "PERSONALIZE",
             personalizedVector: new Array(105).fill(4),
             owner: user.username
           };
@@ -139,13 +146,13 @@ const Preferences = () => {
   };
 
   // Handle preference time of day selection
-  const handlePreferredTimeChange = (value: "MORNING" | "AFTERNOON" | "EVENING" | "PERSONALIZE") => {
+  const handlePreferredTimeChange = (value: "MORNING" | "AFTERNOON" | "EVENING" | "CIRCADIAN" | "PERSONALIZE") => {
     setPreferences({ ...preferences, preferredTimeOfDay: value });
     setShowPersonalizeGrid(value === "PERSONALIZE");
   };
 
   // Fill grid with recommended values based on preferred time of day
-  const handleFillWithRecommendations = (selectedOption: 'MORNING' | 'AFTERNOON' | 'EVENING') => {
+  const handleFillWithRecommendations = (selectedOption: 'MORNING' | 'AFTERNOON' | 'EVENING' | 'CIRCADIAN') => {
     const newVector = [...preferences.personalizedVector];
     
     // Apply the selected preference pattern
@@ -183,6 +190,60 @@ const Preferences = () => {
           } else {
             newVector[vectorIndex] = 2;
           }
+        } else if (selectedOption === 'CIRCADIAN') {
+          // Define values for circadian cycles
+          const U = 0;  // Unavailable
+          const L = 2;  // Low Preference
+          const N = 4;  // Neutral
+          const P = 6;  // Preferred
+          const H = 9;  // Highly Preferred
+          
+          // For Monday through Friday (0-4)
+          if (dayIndex <= 4) {
+            if (hour >= 8 && hour <= 11) { // 8am-11am
+              newVector[vectorIndex] = [P, H, H, H][hour - 8] || H;
+            } else if (hour === 12) { // 12pm
+              newVector[vectorIndex] = H;
+            } else if (hour >= 13 && hour <= 16) { // 1pm-4pm
+              newVector[vectorIndex] = [N, L, P, H][hour - 13] || N;
+            } else if (hour >= 17 && hour <= 19) { // 5pm-7pm
+              newVector[vectorIndex] = [H, N, N][hour - 17] || N;
+            } else { // 8pm-10pm
+              newVector[vectorIndex] = [L, U, U][hour - 20] || L;
+            }
+          } 
+          // For Saturday (5)
+          else if (dayIndex === 5) {
+            if (hour === 8) { // 8am
+              newVector[vectorIndex] = N;
+            } else if (hour >= 9 && hour <= 11) { // 9am-11am
+              newVector[vectorIndex] = [P, H, H][hour - 9] || H;
+            } else if (hour === 12) { // 12pm
+              newVector[vectorIndex] = H;
+            } else if (hour >= 13 && hour <= 16) { // 1pm-4pm
+              newVector[vectorIndex] = [N, L, L, N][hour - 13] || L;
+            } else if (hour >= 17 && hour <= 19) { // 5pm-7pm
+              newVector[vectorIndex] = [P, H, N][hour - 17] || N;
+            } else { // 8pm-10pm
+              newVector[vectorIndex] = [N, L, U][hour - 20] || L;
+            }
+          } 
+          // For Sunday (6)
+          else if (dayIndex === 6) {
+            if (hour === 8) { // 8am
+              newVector[vectorIndex] = N;
+            } else if (hour >= 9 && hour <= 11) { // 9am-11am
+              newVector[vectorIndex] = [P, H, H][hour - 9] || H;
+            } else if (hour === 12) { // 12pm
+              newVector[vectorIndex] = N;
+            } else if (hour >= 13 && hour <= 16) { // 1pm-4pm
+              newVector[vectorIndex] = [L, L, L, N][hour - 13] || L;
+            } else if (hour >= 17 && hour <= 18) { // 5pm-6pm
+              newVector[vectorIndex] = [P, N][hour - 17] || N;
+            } else { // 7pm-10pm
+              newVector[vectorIndex] = [N, L, L, U][hour - 19] || L;
+            }
+          }
         }
       }
     }
@@ -201,9 +262,56 @@ const Preferences = () => {
     setShowFillOptions(false);
   };
 
+  // Function to suggest study hours based on number of courses
+  const suggestStudyHours = () => {
+    if (userCourses.length === 0) {
+      setMessage({ 
+        type: 'error', 
+        text: 'No courses selected. Please select courses in the Course Selection page first.' 
+      });
+      return;
+    }
+    
+    // Calculate 8 hours per course
+    const suggestedHours = Math.min(userCourses.length * 8, 60); // Cap at 60 hours
+    
+    setPreferences(prev => ({ 
+      ...prev, 
+      studyTime: suggestedHours.toString() 
+    }));
+    
+    setMessage({ 
+      type: 'success', 
+      text: `Suggested ${suggestedHours} hours of study based on ${userCourses.length} course${userCourses.length === 1 ? '' : 's'} (8 hours per course)` 
+    });
+  };
+
   const validatePreferences = () => {
+    const studyTimeNumber = Number(preferences.studyTime);
+    if (isNaN(studyTimeNumber) || studyTimeNumber <= 0 || studyTimeNumber > 60) {
+      setMessage({ type: 'error', text: 'Weekly study hours must be between 1 and 60' });
+      return false;
+    }
+    
+    // Check if the study hours are too low based on course count (less than 5 per course)
+    if (userCourses.length > 0 && studyTimeNumber < userCourses.length * 5) {
+      setMessage({ 
+        type: 'error', 
+        text: `${studyTimeNumber} hours seems low for ${userCourses.length} course${userCourses.length === 1 ? '' : 's'}. Consider using the "Suggest Hours" button for a recommended value.` 
+      });
+      return false;
+    }
+    
     if (preferences.maxHoursPerDay <= 0 || preferences.maxHoursPerDay > 24) {
       setMessage({ type: 'error', text: 'Maximum hours per day must be between 1 and 24' });
+      return false;
+    }
+    // Check that max hours per day doesn't exceed weekly hours
+    if (preferences.maxHoursPerDay > studyTimeNumber) {
+      setMessage({ 
+        type: 'error', 
+        text: 'Maximum hours per day cannot exceed total weekly study hours' 
+      });
       return false;
     }
     return true;
@@ -327,6 +435,26 @@ const Preferences = () => {
         
         <form className="preferences-form" onSubmit={handleSubmit}>
           <div className="form-group">
+            <label>Weekly Study Hours</label>
+            <div className="input-with-button">
+              <input
+                type="number"
+                min="1"
+                max="60"
+                value={preferences.studyTime}
+                onChange={(e) => setPreferences({ ...preferences, studyTime: e.target.value })}
+              />
+              <button 
+                type="button" 
+                className="suggest-button"
+                onClick={suggestStudyHours}
+              >
+                Suggest Hours
+              </button>
+            </div>
+            <small className="form-help-text">Number of study hours to generate each week (8 hours per course recommended)</small>
+          </div>
+          <div className="form-group">
             <label>Maximum Hours Per Day</label>
             <input
               type="number"
@@ -348,11 +476,12 @@ const Preferences = () => {
             <label>Preferred Time of Day</label>
             <select
               value={preferences.preferredTimeOfDay}
-              onChange={(e) => handlePreferredTimeChange(e.target.value as "MORNING" | "AFTERNOON" | "EVENING" | "PERSONALIZE")}
+              onChange={(e) => handlePreferredTimeChange(e.target.value as "MORNING" | "AFTERNOON" | "EVENING" | "CIRCADIAN" | "PERSONALIZE")}
             >
               <option value="MORNING">Morning</option>
               <option value="AFTERNOON">Afternoon</option>
               <option value="EVENING">Evening</option>
+              <option value="CIRCADIAN">Circadian Cycles</option>
               <option value="PERSONALIZE">Personalize</option>
             </select>
           </div>
@@ -474,6 +603,18 @@ const Preferences = () => {
                         <span className="pattern-indicator high"></span>
                       </div>
                       <span>Evening Preference</span>
+                    </div>
+                    <div 
+                      className="fill-dropdown-item" 
+                      onClick={() => handleFillWithRecommendations('CIRCADIAN')}
+                    >
+                      <div className="preference-pattern">
+                        <span className="pattern-indicator medium"></span>
+                        <span className="pattern-indicator high"></span>
+                        <span className="pattern-indicator low"></span>
+                        <span className="pattern-indicator high"></span>
+                      </div>
+                      <span>Circadian Cycles</span>
                     </div>
                   </div>
                 </>

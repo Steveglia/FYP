@@ -85,9 +85,41 @@ function App() {
     }
   }, [user, preferencesInitialized]);
 
-  const handleCoursesChange = (selectedCourses: string[]) => {
+  const handleCoursesChange = async (selectedCourses: string[]) => {
     console.log('Selected courses:', selectedCourses);
-    // You can handle the selected courses here, e.g., save to state or send to an API
+    
+    if (user) {
+      try {
+        // First, get the existing preferences
+        const { data: preferences } = await client.models.StudyPreference.list({
+          filter: { owner: { eq: user.username } }
+        });
+        
+        if (preferences.length > 0) {
+          // Calculate recommended study hours (8 per course, capped at 60)
+          const recommendedHours = Math.min(selectedCourses.length * 8, 60).toString();
+          
+          // Only update studyTime if there's a big change in course count
+          const currentStudyTime = preferences[0].studyTime ? Number(preferences[0].studyTime) : 0;
+          const suggestedStudyTime = Number(recommendedHours);
+          
+          // Update study time if it's a significant change (more than 2 courses difference)
+          const significantChange = Math.abs(suggestedStudyTime - currentStudyTime) >= 16;
+          
+          if (significantChange) {
+            // Update the study time as well
+            await client.models.StudyPreference.update({
+              id: preferences[0].id,
+              studyTime: recommendedHours
+            });
+            
+            console.log(`Updated study time to ${recommendedHours} hours based on ${selectedCourses.length} courses`);
+          }
+        }
+      } catch (error) {
+        console.error("Error updating study time:", error);
+      }
+    }
   };
 
   return (

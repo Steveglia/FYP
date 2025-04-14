@@ -775,8 +775,8 @@ export const handler: Schema["generateStudySessions"]["functionHandler"] = async
   // Default values if no preferences are found
   const maxHoursPerDay = studyPreference?.maxHoursPerDay || 4;
   const courses = studyPreference?.courses?.filter(course => typeof course === 'string') || [];
-  // Fixed at 16 study sessions as per requirements
-  const totalStudyHours = 16;
+  // Use the user's study time preference or default to 16 hours
+  const totalStudyHours = studyPreference?.studyTime ? Number(studyPreference.studyTime) : 16;
   
   console.log('Using maxHoursPerDay:', maxHoursPerDay);
   console.log('Using totalStudyHours:', totalStudyHours);

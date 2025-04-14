@@ -88,7 +88,7 @@ const schema = a
         lunchBreakStart: a.string(),
         lunchBreakDuration: a.integer(),
         studyDuringWork: a.boolean(),
-        preferredTimeOfDay: a.enum(['MORNING', 'AFTERNOON', 'EVENING', 'PERSONALIZE']),
+        preferredTimeOfDay: a.enum(['MORNING', 'AFTERNOON', 'EVENING', 'CIRCADIAN', 'PERSONALIZE']),
         personalizedVector: a.string(),
         owner: a.string(),
         courses: a.string().array()

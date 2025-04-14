@@ -1131,4 +1131,91 @@ export const deleteAcceptedPersonalLearningSessions = async (weekStartDate: Date
     console.error('Error deleting accepted personal learning sessions:', error);
     return false;
   }
+};
+
+// Update an existing accepted study session with a new time slot
+export const relocateStudySession = async (
+  sessionId: string,
+  newDay: string,
+  newHour: number,
+  userId: string,
+  weekStartDate: Date
+): Promise<boolean> => {
+  try {
+    // First, get the existing session to preserve its duration
+    const { data: existingSession, errors } = await client.models.AcceptedStudySession.get({
+      id: sessionId
+    });
+
+    if (errors || !existingSession) {
+      console.error('Error fetching existing study session:', errors);
+      return false;
+    }
+
+    // Calculate the duration of the original session
+    let durationMs = 3600000; // Default 1 hour (60 * 60 * 1000 ms)
+    
+    if (existingSession.startDate && existingSession.endDate) {
+      const startDate = new Date(existingSession.startDate);
+      const endDate = new Date(existingSession.endDate);
+      durationMs = endDate.getTime() - startDate.getTime();
+    }
+
+    // Calculate the new start and end dates
+    const dayMap: {[key: string]: number} = {
+      'Monday': 0,
+      'Tuesday': 1,
+      'Wednesday': 2,
+      'Thursday': 3,
+      'Friday': 4,
+      'Saturday': 5,
+      'Sunday': 6
+    };
+
+    const dayIndex = dayMap[newDay];
+    if (dayIndex === undefined) {
+      console.error('Invalid day for study session relocation:', newDay);
+      return false;
+    }
+
+    // Create new start date
+    const newStartDate = new Date(weekStartDate);
+    newStartDate.setDate(weekStartDate.getDate() + dayIndex);
+    newStartDate.setHours(newHour, 0, 0, 0);
+
+    // Create new end date based on the original duration
+    const newEndDate = new Date(newStartDate.getTime() + durationMs);
+
+    // Format times for display
+    const startTime = `${String(newHour).padStart(2, '0')}:00`;
+    const endTime = `${String(newEndDate.getHours()).padStart(2, '0')}:${String(newEndDate.getMinutes()).padStart(2, '0')}`;
+
+    // Update the session
+    const result = await client.models.AcceptedStudySession.update({
+      id: sessionId,
+      day: newDay,
+      startTime,
+      endTime,
+      startDate: newStartDate.toISOString(),
+      endDate: newEndDate.toISOString(),
+      userId,
+      weekStartDate: weekStartDate.toISOString(),
+      // Preserve other fields
+      course: existingSession.course,
+      title: existingSession.title,
+      description: existingSession.description,
+      type: 'STUDY'
+    });
+
+    if (result.errors) {
+      console.error('Error updating study session:', result.errors);
+      return false;
+    }
+
+    console.log('Study session relocated successfully:', result);
+    return true;
+  } catch (error) {
+    console.error('Error relocating study session:', error);
+    return false;
+  }
 }; 
