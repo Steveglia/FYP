@@ -334,10 +334,11 @@
 /* Work event specific styling */
 .event-item.work {
   background-color: #e74c3c !important; /* Red color for work events */
-  border: 1px solid #c0392b; 
+  border: 1px solid #c0392b !important;
   font-weight: bold;
   min-height: 42px !important;
   padding: 6px 8px !important; /* Ensure consistent padding */
+  color: white !important;
 }
 
 /* Style for the course code in multi-hour events */
@@ -466,6 +467,66 @@
   margin-top: 8px;
   font-size: 0.65rem;
   opacity: 0.9;
+  background-color: #3498db !important; /* Ensure blue color for study sessions */
+  border: 1px solid #2980b9;
+}
+
+.event-item.study.study-selected {
+  border: 2px solid #ff9800 !important;
+  box-shadow: 0 0 8px rgba(255, 152, 0, 0.7) !important;
+  z-index: 5;
+}
+
+.success-message {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #4caf50;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 4px;
+  z-index: 1000;
+  font-weight: bold;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  animation: fadeInOut 3s;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.schedule-cell.moving-enabled {
+  cursor: pointer;
+  background-color: rgba(255, 152, 0, 0.05);
+}
+
+.schedule-cell.moving-enabled:hover {
+  background-color: rgba(255, 152, 0, 0.15);
+}
+
+.moving-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background-color: rgba(255, 152, 0, 0.1);
+  padding: 8px;
+  text-align: center;
+}
+
+.moving-message {
+  background-color: #ff9800;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+  display: inline-block;
+  font-weight: bold;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 /* Lecture and lab basic styling */
@@ -487,14 +548,6 @@
   /* Two-hour event (90px = 2*45px) */
   border-radius: 5px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-/* Make sure single-hour lecture and lab events have enough height */
-.event-item.lecture,
-.event-item.lab {
-  font-weight: bold;
-  min-height: 42px !important;
-  padding: 6px 8px !important; /* Ensure consistent padding */
 }
 
 /* Review session specific styling */

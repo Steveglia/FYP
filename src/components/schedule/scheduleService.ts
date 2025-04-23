@@ -155,6 +155,12 @@ export const fetchLectures = async (currentWeekStart: Date, userId?: string): Pr
       }
     }
     
+    // If the user has no selected courses and we have a userId, return empty array
+    // This ensures no courses are shown when none are selected
+    if (userId && userSelectedCourses.length === 0) {
+      return [];
+    }
+    
     // Query lectures for the current week
     const result = await client.models.Lectures.list({
       filter: {
@@ -172,7 +178,7 @@ export const fetchLectures = async (currentWeekStart: Date, userId?: string): Pr
       // Process each lecture
       for (const lecture of result.data) {
         // Skip lectures for courses the user hasn't selected
-        if (userId && userSelectedCourses.length > 0 && lecture.courseId) {
+        if (userId && lecture.courseId) {
           if (!userSelectedCourses.includes(lecture.courseId)) {
             continue; // Skip this lecture as it's not from a selected course
           }

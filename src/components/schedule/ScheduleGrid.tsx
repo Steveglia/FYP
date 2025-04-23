@@ -3,6 +3,7 @@ import { ScheduleEvent, weekDays, hours, eventTypeColors, ensureValidEventType }
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from "../../../amplify/data/resource";
 import { useAuthenticator } from '@aws-amplify/ui-react';
+import { relocateStudySession } from './scheduleService';
 
 const client = generateClient<Schema>();
 
@@ -10,17 +11,35 @@ interface ScheduleGridProps {
   eventsByDayAndTime: { [key: string]: { [key: string]: ScheduleEvent[] } };
   onEventClick?: (event: ScheduleEvent) => void;
   recentlyCompletedLectures?: string[]; // New prop to track recently completed lectures
+  onScheduleUpdated?: () => void; // Callback when a study session is moved
 }
 
 const ScheduleGrid: React.FC<ScheduleGridProps> = ({ 
   eventsByDayAndTime, 
   onEventClick,
-  recentlyCompletedLectures = [] // Default to empty array
+  recentlyCompletedLectures = [], // Default to empty array
+  onScheduleUpdated
 }) => {
   const { user } = useAuthenticator();
   const [progressMap, setProgressMap] = useState<Record<string, boolean>>({});
   const [lectureProgressMap, setLectureProgressMap] = useState<Record<string, boolean>>({});
+  const [selectedSession, setSelectedSession] = useState<ScheduleEvent | null>(null);
+  const [movingSession, setMovingSession] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
+  // Process the schedule data for efficiency
+  const processedSchedule = useMemo(() => eventsByDayAndTime, [eventsByDayAndTime]);
+
+  // Clear success message after a delay
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => {
+        setSuccessMessage(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
+
   // Fetch quiz progress data when component mounts
   useEffect(() => {
     const fetchProgressData = async () => {
@@ -70,6 +89,70 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     
     fetchProgressData();
   }, [user]);
+
+  // Handle clicking on a study session
+  const handleStudySessionClick = (event: ScheduleEvent) => {
+    // Only allow selecting accepted study sessions
+    if (ensureValidEventType(event.type) === 'STUDY' && event.isAcceptedStudySession) {
+      if (selectedSession && selectedSession.id === event.id) {
+        // If we click the same session again, deselect it
+        setSelectedSession(null);
+        setMovingSession(false);
+      } else {
+        // Select the session and enable moving mode
+        setSelectedSession(event);
+        setMovingSession(true);
+      }
+    }
+  };
+
+  // Handle clicking on an empty cell to move the selected study session
+  const handleCellClick = async (day: string, hour: number) => {
+    if (!movingSession || !selectedSession || !selectedSession.id || !user) {
+      return;
+    }
+
+    try {
+      // Get the current week start date from the first day of the current week
+      // Since we don't have direct access to weekStartDate in the ScheduleEvent type,
+      // we'll use the startDate of the event to calculate the start of the week
+      const eventDate = selectedSession.startDate ? new Date(selectedSession.startDate) : new Date();
+      const weekStartDate = new Date(eventDate);
+      const dayOfWeek = eventDate.getDay();
+      const diff = eventDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Adjust for Sunday
+      weekStartDate.setDate(diff);
+      weekStartDate.setHours(0, 0, 0, 0);
+      
+      // Reset moving state immediately to prevent multiple clicks
+      setMovingSession(false);
+      
+      // Call the API to relocate the study session
+      const success = await relocateStudySession(
+        selectedSession.id,
+        day,
+        hour,
+        user.username,
+        weekStartDate
+      );
+
+      if (success) {
+        // Clear selection
+        setSelectedSession(null);
+        
+        // Show success message
+        setSuccessMessage(`Study session moved to ${day} at ${hour}:00`);
+        
+        // Notify parent component to refresh data
+        if (onScheduleUpdated) {
+          onScheduleUpdated();
+        }
+      } else {
+        console.error('Failed to relocate study session');
+      }
+    } catch (error) {
+      console.error('Error relocating study session:', error);
+    }
+  };
   
   // Function to format event title for display
   const formatEventTitle = (event: ScheduleEvent): string | JSX.Element => {
@@ -137,6 +220,8 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     
     if (event.isLecture) {
       parts.push('Click to submit quiz score');
+    } else if (ensureValidEventType(event.type) === 'STUDY' && event.isAcceptedStudySession) {
+      parts.push('Click to select and move this study session');
     }
     
     return parts.filter(Boolean).join('\n');
@@ -146,6 +231,8 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
   const handleEventClick = (event: ScheduleEvent) => {
     if (event.isLecture && onEventClick) {
       onEventClick(event);
+    } else if (ensureValidEventType(event.type) === 'STUDY' && event.isAcceptedStudySession) {
+      handleStudySessionClick(event);
     }
   };
   
@@ -224,6 +311,17 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
       alignItems: 'center',
       justifyContent: 'center'
     };
+
+    // Add highlighting for selected study session
+    if (selectedSession && event.id === selectedSession.id) {
+      styles.border = '2px solid #ff9800';
+      styles.boxShadow = '0 0 8px rgba(255, 152, 0, 0.7)';
+    }
+    
+    // Make study sessions look clickable
+    if (ensureValidEventType(event.type) === 'STUDY' && event.isAcceptedStudySession) {
+      styles.cursor = 'pointer';
+    }
     
     // Check if this is a multi-hour event (longer than 1 hour)
     let isMultiHourEvent = false;
@@ -249,13 +347,6 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
       }
     }
     
-    // Check if it's a work or leisure event
-    const isWorkOrLeisure = 
-      (event.type && ['WORK', 'LEISURE'].includes(event.type.toUpperCase())) ||
-      (event.title && (event.title.toLowerCase().includes('work') || 
-                     event.title.toLowerCase().includes('leisure') || 
-                     event.title.toLowerCase().includes('job')));
-    
     // For single-hour events, provide standard padding
     if (!isMultiHourEvent) {
       // Study sessions have less padding for compact display
@@ -263,7 +354,7 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
         styles.padding = '4px 6px';
       } 
       // Work/leisure events need specific styling
-      else if (isWorkOrLeisure) {
+      else if (isWorkOrLeisure(event)) {
         styles.padding = '5px 8px';
         styles.flexDirection = 'column';
       }
@@ -278,7 +369,7 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
       styles.padding = '8px 10px'; // Increased horizontal padding
       
       // Work/leisure specific styling for multi-hour events
-      if (isWorkOrLeisure) {
+      if (isWorkOrLeisure(event)) {
         styles.textAlign = 'center';
       }
     }
@@ -286,8 +377,46 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     return styles;
   };
 
-  // Function to get the background color based on event type
+  // Helper function to determine if an event is work or leisure
+  const isWorkOrLeisure = (event: ScheduleEvent): boolean => {
+    // Check if the type is explicitly WORK or LEISURE
+    if (event.type && ['WORK', 'LEISURE'].includes(event.type.toUpperCase())) {
+      return true;
+    }
+    
+    // Check if the title contains work-related terms
+    if (event.title && (
+      event.title.toLowerCase().includes('work') || 
+      event.title.toLowerCase().includes('leisure') || 
+      event.title.toLowerCase().includes('job')
+    )) {
+      return true;
+    }
+    
+    // Check if the description contains work-related terms
+    if (event.description && (
+      event.description.toLowerCase().includes('work') ||
+      event.description.toLowerCase().includes('leisure') ||
+      event.description.toLowerCase().includes('job')
+    )) {
+      return true;
+    }
+    
+    return false;
+  };
+
+  // Function to determine background color
   const getBackgroundColor = (event: ScheduleEvent): string => {
+    // For work events, let CSS class handle the color
+    if (isWorkOrLeisure(event) || ensureValidEventType(event.type) === 'WORK') {
+      return 'transparent'; // Let CSS class handle the color
+    }
+
+    // For lectures with completed quizzes, use a lighter version of the color
+    if (event.isLecture && hasQuizScore(event)) {
+      return '#d2b5e8'; // Lighter purple for completed lectures
+    }
+    
     // Check if it's a lecture or lab
     if (event.isLecture) {
       return eventTypeColors.LECTURE;
@@ -296,39 +425,28 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
       return eventTypeColors.LAB;
     }
     
-    // Check for work-related events by title or description
-    if (event.title) {
-      const lowercaseTitle = event.title.toLowerCase();
-      if (lowercaseTitle.includes('work') || 
-          lowercaseTitle.includes('job') || 
-          lowercaseTitle.includes('leisure') ||
-          lowercaseTitle.includes('career')) {
-        return eventTypeColors.WORK;
-      }
+    // Study sessions already have CSS classes
+    if (ensureValidEventType(event.type) === 'STUDY') {
+      return 'transparent'; // Let CSS class handle the color
     }
     
-    if (event.description) {
-      const lowercaseDesc = event.description.toLowerCase();
-      if (lowercaseDesc.includes('work') || 
-          lowercaseDesc.includes('job') || 
-          lowercaseDesc.includes('leisure') ||
-          lowercaseDesc.includes('career')) {
-        return eventTypeColors.WORK;
-      }
+    // Learning sessions
+    if (ensureValidEventType(event.type) === 'LEARNING') {
+      return eventTypeColors.LEARNING;
     }
     
-    // Use the type-based coloring with safe conversion
-    const eventType = ensureValidEventType(event.type) as keyof typeof eventTypeColors;
-    return eventTypeColors[eventType] || eventTypeColors.default;
+    // For all other events, use the type-based coloring
+    const type = ensureValidEventType(event.type || 'OTHER');
+    return eventTypeColors[type] || eventTypeColors.default;
   };
-
-  // Simplify the processedSchedule useMemo
-  const processedSchedule = useMemo(() => {
-    return JSON.parse(JSON.stringify(eventsByDayAndTime));
-  }, [eventsByDayAndTime]);
 
   return (
     <div className="schedule-grid">
+      {successMessage && (
+        <div className="success-message">
+          {successMessage}
+        </div>
+      )}
       <div className="time-column">
         <div className="header-cell">Time</div>
         {hours.map(hour => (
@@ -341,7 +459,11 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
         <div key={day} className="day-column">
           <div className="header-cell">{day}</div>
           {hours.map(hour => (
-            <div key={`${day}-${hour}`} className="schedule-cell">
+            <div 
+              key={`${day}-${hour}`} 
+              className={`schedule-cell ${movingSession ? 'moving-enabled' : ''}`}
+              onClick={movingSession ? () => handleCellClick(day, hour) : undefined}
+            >
               {processedSchedule && processedSchedule[day] && processedSchedule[day][hour] 
                 ? processedSchedule[day][hour]
                   .filter((event: ScheduleEvent) => event.isStart === true)
@@ -356,12 +478,16 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
 
                     // Add work class for work and leisure events
                     const eventType = ensureValidEventType(event.type);
-                    if (eventType === 'WORK') {
+                    if (eventType === 'WORK' || isWorkOrLeisure(event)) {
                       eventClasses += ' work';
                     }
 
-                    if (ensureValidEventType(event.type) === 'STUDY' || (event.title && event.title.toLowerCase().includes('study'))) {
+                    if (eventType === 'STUDY' || (event.title && event.title.toLowerCase().includes('study'))) {
                       eventClasses += ' study';
+                      // Add selected class if this is the selected session
+                      if (selectedSession && event.id === selectedSession.id) {
+                        eventClasses += ' study-selected';
+                      }
                     }
                     
                     // Get the duration for tooltip
@@ -397,6 +523,13 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
           ))}
         </div>
       ))}
+      {movingSession && (
+        <div className="moving-overlay">
+          <div className="moving-message">
+            Select a new time slot to move the study session
+          </div>
+        </div>
+      )}
     </div>
   );
 };

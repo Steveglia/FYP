@@ -26,6 +26,8 @@ const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lectureScores, setLectureScores] = useState<Record<string, number>>({});
+  const [lectureDifficulty, setLectureDifficulty] = useState<string>('Medium');
+  const [lectureDuration, setLectureDuration] = useState<string>('');
   
   // Load user progress data when modal opens
   useEffect(() => {
@@ -33,8 +35,27 @@ const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
       setScore(0);
       setErrorMessage(null);
       loadUserProgress();
+      fetchLectureMetadata();
     }
   }, [isOpen, lecture, user]);
+  
+  // Fetch lecture metadata (difficulty and duration)
+  const fetchLectureMetadata = async () => {
+    if (!lecture?.id) return;
+    
+    try {
+      // Get lecture from Lectures model
+      const lectureResult = await client.models.Lectures.get({ id: lecture.id });
+      
+      if (lectureResult.data) {
+        // Set difficulty and duration from lecture data
+        setLectureDifficulty(lectureResult.data.difficulty || 'Medium');
+        setLectureDuration(lectureResult.data.duration || '');
+      }
+    } catch (error) {
+      console.error('Error fetching lecture metadata:', error);
+    }
+  };
   
   // Load user progress data for all courses and lectures
   const loadUserProgress = async () => {
@@ -298,6 +319,8 @@ const LectureQuizModal: React.FC<LectureQuizModalProps> = ({
             <p><strong>Date:</strong> {formatDate(lecture.startDate)} at {formatTime(lecture.startDate)}</p>
             {lecture.description && <p><strong>Description:</strong> {lecture.description}</p>}
             {lecture.location && <p><strong>Location:</strong> {lecture.location}</p>}
+            <p><strong>Difficulty:</strong> {lectureDifficulty}</p>
+            {lectureDuration && <p><strong>Duration:</strong> {lectureDuration}</p>}
             
             {/* Show previous score if it exists */}
             {lecture.id && lectureScores[lecture.id] > 0 && (

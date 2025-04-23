@@ -29,7 +29,6 @@ async function initializeStudyPreference(userId: string) {
         maxHoursPerDay: 8,
         lunchBreakStart: "12:00", // No longer used in UI, kept for compatibility
         lunchBreakDuration: 60,   // No longer used in UI, kept for compatibility
-        studyDuringWork: false,
         preferredTimeOfDay: "MORNING",
         owner: userId
       });

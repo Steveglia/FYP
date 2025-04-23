@@ -27,7 +27,6 @@ const Preferences = () => {
     maxHoursPerDay: 8,
     lunchBreakStart: "12:00",
     lunchBreakDuration: 60,
-    studyDuringWork: false,
     preferredTimeOfDay: "MORNING" as "MORNING" | "AFTERNOON" | "EVENING" | "CIRCADIAN" | "PERSONALIZE",
     personalizedVector: new Array(105).fill(4) // Default to neutral preference (4)
   });
@@ -71,7 +70,6 @@ const Preferences = () => {
             maxHoursPerDay: userPrefs.maxHoursPerDay ?? 8,
             lunchBreakStart: userPrefs.lunchBreakStart ?? "12:00",
             lunchBreakDuration: userPrefs.lunchBreakDuration ?? 60,
-            studyDuringWork: userPrefs.studyDuringWork ?? false,
             preferredTimeOfDay: (userPrefs.preferredTimeOfDay ?? "MORNING") as "MORNING" | "AFTERNOON" | "EVENING" | "CIRCADIAN" | "PERSONALIZE",
             personalizedVector: personalizedVectorData
           });
@@ -84,7 +82,6 @@ const Preferences = () => {
             maxHoursPerDay: 8,
             lunchBreakStart: "12:00",
             lunchBreakDuration: 60,
-            studyDuringWork: false,
             preferredTimeOfDay: "MORNING" as "MORNING" | "AFTERNOON" | "EVENING" | "CIRCADIAN" | "PERSONALIZE",
             personalizedVector: new Array(105).fill(4),
             owner: user.username
@@ -95,7 +92,6 @@ const Preferences = () => {
             maxHoursPerDay: defaultPrefs.maxHoursPerDay,
             lunchBreakStart: defaultPrefs.lunchBreakStart,
             lunchBreakDuration: defaultPrefs.lunchBreakDuration,
-            studyDuringWork: defaultPrefs.studyDuringWork,
             preferredTimeOfDay: defaultPrefs.preferredTimeOfDay,
             personalizedVector: JSON.stringify(defaultPrefs.personalizedVector),
             owner: defaultPrefs.owner
@@ -341,7 +337,6 @@ const Preferences = () => {
           maxHoursPerDay: preferences.maxHoursPerDay,
           lunchBreakStart: preferences.lunchBreakStart,
           lunchBreakDuration: preferences.lunchBreakDuration,
-          studyDuringWork: preferences.studyDuringWork,
           preferredTimeOfDay: preferences.preferredTimeOfDay,
           personalizedVector: JSON.stringify(preferences.personalizedVector),
           owner: user.username
@@ -357,7 +352,6 @@ const Preferences = () => {
           maxHoursPerDay: preferences.maxHoursPerDay,
           lunchBreakStart: preferences.lunchBreakStart,
           lunchBreakDuration: preferences.lunchBreakDuration,
-          studyDuringWork: preferences.studyDuringWork,
           preferredTimeOfDay: preferences.preferredTimeOfDay,
           personalizedVector: JSON.stringify(preferences.personalizedVector),
           owner: user.username
@@ -461,16 +455,6 @@ const Preferences = () => {
               value={preferences.maxHoursPerDay}
               onChange={(e) => setPreferences({ ...preferences, maxHoursPerDay: Number(e.target.value) })}
             />
-          </div>
-          <div className="form-group">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={preferences.studyDuringWork}
-                onChange={(e) => setPreferences({ ...preferences, studyDuringWork: e.target.checked })}
-              />
-              Allow Study During Work Hours
-            </label>
           </div>
           <div className="form-group">
             <label>Preferred Time of Day</label>

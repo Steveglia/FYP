@@ -9,10 +9,11 @@ type Event = Schema["CalendarEvent"]["type"];
 interface WeeklyScheduleWrapperProps {
   events?: Event[];
   userId?: string;
+  showUserEvents?: boolean;
 }
 
 // This is just a wrapper component to maintain backward compatibility
-const WeeklyScheduleWrapper: React.FC<WeeklyScheduleWrapperProps> = ({ events, userId }) => {
+const WeeklyScheduleWrapper: React.FC<WeeklyScheduleWrapperProps> = ({ events, userId, showUserEvents = true }) => {
   const { user } = useAuthenticator();
   
   // Use provided userId or fall back to authenticated user's ID
@@ -31,7 +32,7 @@ const WeeklyScheduleWrapper: React.FC<WeeklyScheduleWrapperProps> = ({ events, u
           </ul>
         </div>
       )}
-      <WeeklySchedule events={events} userId={effectiveUserId} />
+      <WeeklySchedule events={events} userId={effectiveUserId} showUserEvents={showUserEvents} />
     </div>
   );
 };

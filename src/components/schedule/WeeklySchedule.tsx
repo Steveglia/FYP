@@ -24,9 +24,10 @@ import './WeeklySchedule.css';
 interface WeeklyScheduleProps {
   events?: Event[];
   userId: string;
+  showUserEvents?: boolean;
 }
 
-export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialEvents = [], userId }) => {
+export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialEvents = [], userId, showUserEvents = true }) => {
   const { user } = useAuthenticator();
   
   // Add state for current week - now starts from the stored week or current week's Monday
@@ -153,9 +154,16 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
   
   // Combine regular events with generated study sessions and lectures and personal learning slots
   const allEvents = useMemo(() => {
-    const combined = [...events, ...generatedStudySessions, ...lectures, ...personalLearningSlots];
+    // First, determine which events are user events (events that aren't lectures, study sessions, or personal learning sessions)
+    let combined = [...lectures, ...generatedStudySessions, ...personalLearningSlots];
+    
+    // Only include regular user events if showUserEvents is true
+    if (showUserEvents) {
+      combined = [...combined, ...events];
+    }
+    
     return combined;
-  }, [events, generatedStudySessions, lectures, personalLearningSlots]);
+  }, [events, generatedStudySessions, lectures, personalLearningSlots, showUserEvents]);
 
   // Process events into a schedule grid
   const eventsByDayAndTime = useMemo(() => {
@@ -659,6 +667,39 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
     }
   };
 
+  // Function to refresh the schedule data
+  const refreshScheduleData = async () => {
+    try {
+      // Get the current user ID
+      const currentUserId = user?.username || userId;
+      
+      // Fetch events for the current week
+      const fetchedEvents = await fetchEvents(currentWeekStart);
+      
+      // Fetch accepted study sessions for the current week
+      const acceptedStudySessions = await fetchAcceptedStudySessions(currentWeekStart, currentUserId);
+      
+      // Fetch accepted personal learning sessions for the current week
+      const acceptedPersonalLearningSessions = await fetchAcceptedPersonalLearningSessions(currentWeekStart, currentUserId);
+      
+      // Update states
+      setHasAcceptedSessions(acceptedStudySessions.length > 0);
+      setHasAcceptedPersonalLearning(acceptedPersonalLearningSessions.length > 0);
+      
+      // Combine all events
+      const combinedEvents = [...fetchedEvents, ...acceptedStudySessions, ...acceptedPersonalLearningSessions];
+      setEvents(combinedEvents);
+      
+      // Refresh lectures as well
+      const fetchedLectures = await fetchLectures(currentWeekStart, currentUserId);
+      setLectures(fetchedLectures);
+      
+    } catch (error) {
+      console.error('Error refreshing schedule data:', error);
+      setError('Failed to refresh schedule data. Please try refreshing the page.');
+    }
+  };
+
   return (
     <div className="weekly-schedule">
       <div className="schedule-header">
@@ -795,6 +836,7 @@ export const WeeklySchedule: React.FC<WeeklyScheduleProps> = ({ events: initialE
         eventsByDayAndTime={eventsByDayAndTime} 
         onEventClick={handleEventClick}
         recentlyCompletedLectures={recentlyCompletedLectures}
+        onScheduleUpdated={refreshScheduleData}
       />
       <ScheduleLegend />
       

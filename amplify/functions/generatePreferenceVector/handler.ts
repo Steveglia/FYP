@@ -1,16 +1,10 @@
 import type { Schema } from "../../data/resource";
 import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/api';
+import outputs from "../../../amplify_outputs.json"
 
-let outputs: any;
-try {
-  outputs = require("../../../amplify_outputs.json");
-} catch (err) {
-  console.log('Amplify outputs not available:', err);
-  outputs = {};
-}
 
-// Use the outputs directly - they already have the correct structure
+
 Amplify.configure(outputs);
 
 const client = generateClient<Schema>();
